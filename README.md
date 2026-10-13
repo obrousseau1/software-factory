@@ -14,7 +14,9 @@ node install/install.mjs <repo>           # marketplace from GitHub
 node install/install.mjs <repo> --local   # marketplace from this checkout (development)
 ```
 
-Then open Claude Code in `<repo>`, accept the plugin prompt, and run `/spaceport:liftoff <idea>`.
+The script runs `claude plugin marketplace add` and `claude plugin install` at project scope, using
+`claude` on PATH or the binary bundled with the VS Code extension. Then start a new Claude Code session
+in `<repo>` and run `/spaceport:liftoff <idea>`.
 
 ## Test
 
