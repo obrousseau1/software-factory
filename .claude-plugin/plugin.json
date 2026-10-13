@@ -1,0 +1,9 @@
+{
+  "name": "spaceport",
+  "version": "0.1.0",
+  "description": "Agent software factory: liftoff turns a one-line idea into reviewed, tested code through intent, specs, plan, shred, work and validation.",
+  "author": {
+    "name": "Olivier Brousseau"
+  },
+  "repository": "https://github.com/obrousseau1/software-factory"
+}

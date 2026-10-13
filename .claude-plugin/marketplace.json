@@ -1,0 +1,14 @@
+{
+  "name": "software-factory",
+  "description": "Marketplace for the spaceport agent software factory.",
+  "owner": {
+    "name": "Olivier Brousseau"
+  },
+  "plugins": [
+    {
+      "name": "spaceport",
+      "source": "./",
+      "description": "Agent software factory orchestrated by liftoff."
+    }
+  ]
+}
