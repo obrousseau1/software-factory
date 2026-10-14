@@ -59,6 +59,30 @@ test('cli prints nothing when allowed', () => {
   assert.equal(result.stdout, '');
 });
 
+test('architect may not write anything', () => {
+  assert.ok(isDenied(decide(input('spaceport:architect', '.liftoff/wo/001-x/drafts/spec.md'))));
+});
+
+test('no subagent may write a living doc, even from a worktree', () => {
+  assert.ok(isDenied(decide(input('spaceport:twin', '.liftoff/wo/001-x/spec.md'))));
+  assert.ok(isDenied(decide(input('twin', join(cwd, '.liftoff', 'wo', '001-x', 'plan.md')))));
+  const worktree = join(cwd, '..', 'wt-1');
+  const fromWorktree = { agent_type: 'twin', cwd: worktree, tool_input: { file_path: join(cwd, '.liftoff/wo/001-x/intent.md') } };
+  assert.ok(isDenied(decide(fromWorktree)));
+});
+
+test('nobody hand-edits script-owned state, not even the main session', () => {
+  for (const file of ['state.json', 'gates.log', '.changelog.json']) {
+    assert.ok(isDenied(decide(input(undefined, `.liftoff/wo/001-x/${file}`))), file);
+    assert.ok(isDenied(decide(input('twin', `.liftoff/wo/001-x/${file}`))), file);
+  }
+});
+
+test('main session may write living docs; twins other .liftoff files', () => {
+  assert.equal(decide(input(undefined, '.liftoff/wo/001-x/spec.md')), null);
+  assert.equal(decide(input('twin', '.liftoff/wo/001-x/shreds/1/handoff.md')), null);
+});
+
 test('explorer may not write anything, not even the profile', () => {
   assert.ok(isDenied(decide(input('spaceport:explorer', '.liftoff/profile.md'))));
 });

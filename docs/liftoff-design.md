@@ -21,7 +21,7 @@ Status: design, ready to build. Decisions marked *(proposed)* are not confirmed 
 ## 2. Lifecycle
 
 ```
- idea ─▶ 1 INTENT ✋ ─▶ 2 SPECS ✋ ─▶ 3 PLAN ─▶ 4 SHRED ─▶ 5 WORK ⇄ VALIDATE ─▶ 6 FINAL ✋
+ idea ─▶ 1 INTENT ✋ ─▶ 2 SPECS ✋ ─▶ 3 PLAN ─▶ 4 SHRED ✋ ─▶ 5 WORK ⇄ VALIDATE ─▶ 6 FINAL ✋
                                                          (per shred, ≤3 rounds)
                                                           round 3 fails ─▶ ✋ escalate
 ```
@@ -32,7 +32,7 @@ Status: design, ready to build. Decisions marked *(proposed)* are not confirmed 
 | 1 | Intent | liftoff ⇄ you, explorer on demand | `intent.md` + size verdict | ✋ interactive |
 | 2 | Specs | architect | `spec.md` with requirement IDs | ✋ approve |
 | 3 | Plan | architect | `plan.md` | — |
-| 4 | Shred | architect | shred list in `plan.md` | — |
+| 4 | Shred | architect | shred list in `plan.md` | ✋ approve plan + shreds |
 | 5 | Work + validate | twins, then 4 validators | code in a worktree, findings | ✋ only on escalation |
 | 6 | Final approval | liftoff → you | PR + summary | ✋ approve |
 
@@ -40,6 +40,11 @@ Status: design, ready to build. Decisions marked *(proposed)* are not confirmed 
 - **Feature** → one work order on the current repo.
 - **App** → repo scaffolded from a stack template, then N work orders. The first is always a walking
   skeleton (builds, one screen/endpoint, one passing test).
+
+**Design round-trip (steps 2-4).** Subagents cannot ask the user. The architect's first spawn returns
+options, a recommendation and open questions; liftoff asks them with `AskUserQuestion`, then re-spawns it
+with the answers to draft (max 2 question rounds per step). One spawn drafts the plan and its shreds; the
+shred step only checks coverage (`scripts/docs.mjs`) before the joint gate.
 
 **Validate loop (step 5).** Validators run after the twins declare a shred done. Liftoff routes each
 finding back to the twins. Max **3 rounds**; still failing → liftoff halts that shred and escalates with
@@ -134,6 +139,7 @@ it, then builds the next requirement.
     shreds/<n>/findings-r<k>.md
     ledger.md                 time + tokens per subagent run (hook-written)
     postmortem.md
+    .changelog.json           body hash + row count per living doc (changelog hook)
 ```
 
 **Living docs.** Liftoff updates them as work reveals new facts. Each change appends a row:
@@ -172,6 +178,8 @@ one file plus the references the checks list.
 | Turn complete | SubagentStop | twin | All gates green; every doubt from the incoming `handoff.md` has a resolution; new `handoff.md` written |
 | UX deep evidence | SubagentStop | ux-validator at `deep` | One screenshot per UI acceptance criterion exists |
 | Shred complete | SubagentStop | twin, when declaring done | Gates green, no `TODO`/`NotImplemented` in diff, every shred `R-xx` referenced by a test |
+| Human gates | PostToolUse `AskUserQuestion` | liftoff | Question tagged `[gate <id> <gate>]` answered `Approve…` → approval + doc hash in `state.json`; every answer logged to `gates.log`. `state.mjs step` refuses a step whose earlier gates are unapproved or whose doc changed since |
+| Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json` → deny |
 | Round cap | PreToolUse `Agent` | liftoff | Spawning a twin for round 4 → deny |
 | Ledger | SubagentStop | all | Sum token usage + elapsed time from `agent_transcript_path` → append to `ledger.md` |
 
@@ -186,6 +194,7 @@ Small, single-purpose, loaded on demand by agents through the Skill tool.
 | `liftoff` | main | Entry point: thin step map; loads `steps/<step>.md` on entering a step |
 | `explore-repo` | profiler | Writes / refreshes `profile.md` |
 | `amend-doc` | liftoff | Edit a living doc + append changelog row |
+| `draft-docs` | architect | Brainstorm questions, draft `spec.md` / `plan.md` from templates |
 | `write-handoff` | twin | Fill `handoff.md` in the fixed format |
 | `run-gates` | twin, liftoff | Run profile's lint, typecheck, test; summarize |
 | `trace-reqs` | twin, spec-validator | Map `R-xx` → tests; list gaps |
@@ -335,3 +344,6 @@ None. Agent names are provisional (§7).
 | 2026-10-13 | Milestone 2: profile format, liftoff runs gates, unknown-shape proposals, first hook (read-only guard) | M2 planning |
 | 2026-10-14 | Explorer split: `profiler` (sonnet, writes profile) + `explorer` (haiku, read-only Q&A) | A per-spawn model override is persuasive, not enforced |
 | 2026-10-14 | `dotnet` stack (backend only); gate failures split into wrong command (fix, retry) vs repo red (no retry, ask user, never weaken) | .NET backends fell to `other`; retries could weaken gates |
+| 2026-10-14 | Human gate after shred: approve plan + shred list together | User decision; M3 "done when" requires an approved plan, and shreds were unreviewed |
+| 2026-10-14 | Milestone 3: architect questions round-trip; one spawn for plan + shreds; changelog Stop hook with snapshot; app verdict runs as one work order until M7 | M3 planning |
+| 2026-10-14 | Human gates enforced: approvals written only from the user's `AskUserQuestion` answer (hook), checked by `state.mjs step` with a doc hash; Decisions table gains a Rejected column | Gates were prompt-only (principle 2) |

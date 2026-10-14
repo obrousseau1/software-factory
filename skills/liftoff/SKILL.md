@@ -1,6 +1,6 @@
 ---
 name: liftoff
-description: Orchestrate the spaceport software factory - turn a one-line idea into reviewed, tested code through intent, specs, plan, shred, work and validation, with the user approving intent, specs and the final result. Use when the user runs /spaceport:liftoff, or asks to start, resume or check a factory work order.
+description: Orchestrate the spaceport software factory - turn a one-line idea into reviewed, tested code through intent, specs, plan, shred, work and validation, with the user approving intent, specs, plan and the final result. Use when the user runs /spaceport:liftoff, or asks to start, resume or check a factory work order.
 argument-hint: "<idea> | resume <id>"
 ---
 
@@ -20,7 +20,9 @@ Next: <what you do now>
 ```
 
 ✅ on track · ⚠️ needs attention or not built yet · ⛔ blocked. No narration, no restating the plan.
-Ask gate questions with `AskUserQuestion`, then reply in the contract.
+Ask gate questions with `AskUserQuestion`, then reply in the contract. A gate question starts with
+`[gate <id> <gate>]` and its first option is `Approve`: a hook records the approval from the user's
+answer, and `state.mjs step` refuses to pass an unapproved gate. Never work around a refusal: ask.
 
 ## Start
 
@@ -40,7 +42,7 @@ Read a step file only when entering that step. Never preload them.
 | Intent | [steps/intent.md](steps/intent.md) | ✋ interactive |
 | Specs | [steps/specs.md](steps/specs.md) | ✋ approve |
 | Plan | [steps/plan.md](steps/plan.md) | — |
-| Shred | [steps/shred.md](steps/shred.md) | — |
+| Shred | [steps/shred.md](steps/shred.md) | ✋ approve plan + shreds |
 | Work | [steps/work.md](steps/work.md) | ✋ on escalation |
 | Validate | [steps/validate.md](steps/validate.md) | ✋ after 3 failed rounds |
 | Final | [steps/final.md](steps/final.md) | ✋ approve |

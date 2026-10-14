@@ -1,12 +1,13 @@
 // Agent names: single source for hooks and static checks. Names are provisional (design §7).
 export const PLUGIN = 'spaceport';
 
-export const Role = Object.freeze({ Explorer: 'explorer', Profiler: 'profiler' });
+export const Role = Object.freeze({ Explorer: 'explorer', Profiler: 'profiler', Architect: 'architect' });
 
 // Restricted roles → the only repo-relative paths they may write ([] = nothing). A trailing `/` allows a folder.
 export const WRITE_LIMITS = Object.freeze({
   [Role.Explorer]: [],
   [Role.Profiler]: ['.liftoff/profile.md', '.liftoff/proposals/'],
+  [Role.Architect]: [],
 });
 
 // Hooks receive `spaceport:profiler`; the bare form is matched too.

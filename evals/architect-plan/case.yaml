@@ -1,0 +1,32 @@
+schema_version: "1.0"
+name: architect-plan
+description: Architect drafts a plan with a shreds table covering every spec requirement, naming real repo files.
+tags: [architect]
+context:
+  add_dirs: [fixture]
+execution:
+  prompt: |
+    Spawn the spaceport architect agent with the Agent tool, with this exact prompt:
+    "Mode: plan. Work order: .liftoff/wo/001-discount under the repo root.
+    No more questions: decide and record in Decisions.
+    Repo root: evals/architect-plan/fixture under the spaceport plugin root (two levels above your draft-docs
+    skill's base directory). Read-only; read nothing else in the plugin."
+    Then reply with the architect's report, verbatim.
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent]
+runs: 3
+graders:
+  - type: regex
+    name: status-draft
+    pattern: 'Status: draft'
+  - type: regex
+    name: shreds-table
+    pattern: '^## Shreds\s*\n\|\s*#\s*\|\s*Title\s*\|\s*Requirements\s*\|\s*Region\s*\|\s*Depends on\s*\|\s*UX\s*\|'
+    flags: m
+  - type: regex
+    name: covers-all
+    pattern: '^(?=[\s\S]*R-01)(?=[\s\S]*R-02)(?=[\s\S]*R-03)(?=[\s\S]*R-04)'
+  - type: regex
+    name: names-real-files
+    pattern: 'Order\.cs|Program\.cs'

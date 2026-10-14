@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { getWorkOrder, newWorkOrder, slugify } from '../scripts/state.mjs';
+import { approve, getWorkOrder, newWorkOrder, setStep, slugify } from '../scripts/state.mjs';
 
 const script = fileURLToPath(new URL('../scripts/state.mjs', import.meta.url));
 const tempRepo = () => mkdtempSync(join(tmpdir(), 'spaceport-state-'));
@@ -62,4 +62,43 @@ test('cli new prints id and path; cli get unknown exits 1', () => {
   const missing = spawnSync(process.execPath, [script, 'get', 'nope'], { cwd: repo, encoding: 'utf8' });
   assert.equal(missing.status, 1);
   assert.match(missing.stderr, /Unknown work order/);
+});
+
+test('step is recorded and survives a get', () => {
+  const repo = tempRepo();
+  const { id } = newWorkOrder(repo, 'step me');
+  approve(repo, id, 'intent');
+  assert.equal(setStep(repo, id, 'specs').step, 'specs');
+  assert.equal(getWorkOrder(repo, id).step, 'specs');
+});
+
+test('a step needs every earlier gate approved', () => {
+  const repo = tempRepo();
+  const { id } = newWorkOrder(repo, 'gated');
+  assert.throws(() => setStep(repo, id, 'specs'), /intent is not approved/);
+  approve(repo, id, 'intent');
+  assert.throws(() => setStep(repo, id, 'plan'), /specs is not approved/);
+});
+
+test('approval covers the doc as it was; a later edit voids it', () => {
+  const repo = tempRepo();
+  const { id, path } = newWorkOrder(repo, 'gated');
+  writeFileSync(join(path, 'spec.md'), '### R-01: a\n');
+  approve(repo, id, 'intent');
+  approve(repo, id, 'specs');
+  assert.equal(setStep(repo, id, 'plan').step, 'plan');
+  writeFileSync(join(path, 'spec.md'), '### R-01: b\n');
+  assert.throws(() => setStep(repo, id, 'plan'), /spec\.md changed since the specs approval/);
+});
+
+test('unknown gate is rejected', () => {
+  const repo = tempRepo();
+  const { id } = newWorkOrder(repo, 'gated');
+  assert.throws(() => approve(repo, id, 'plan'), /Unknown gate/);
+});
+
+test('unknown step is rejected', () => {
+  const repo = tempRepo();
+  const { id } = newWorkOrder(repo, 'step me');
+  assert.throws(() => setStep(repo, id, 'deploy'), /Unknown step/);
 });
