@@ -347,3 +347,4 @@ None. Agent names are provisional (§7).
 | 2026-10-14 | Human gate after shred: approve plan + shred list together | User decision; M3 "done when" requires an approved plan, and shreds were unreviewed |
 | 2026-10-14 | Milestone 3: architect questions round-trip; one spawn for plan + shreds; changelog Stop hook with snapshot; app verdict runs as one work order until M7 | M3 planning |
 | 2026-10-14 | Human gates enforced: approvals written only from the user's `AskUserQuestion` answer (hook), checked by `state.mjs step` with a doc hash; Decisions table gains a Rejected column | Gates were prompt-only (principle 2) |
+| 2026-10-14 | `state.mjs step` moves one step forward (or back to any earlier); amending an approved doc sends liftoff back to its gate (spec change also redoes plan + shred) | Manual test: liftoff jumped to `final`; post-approval spec edit had no recovery path |

@@ -36,12 +36,13 @@ test('change answer is logged, not approved', () => {
   assert.match(readFileSync(join(path, 'gates.log'), 'utf8'), /intent: Change: drop the export/);
 });
 
-test('answers in tool_input are read too', () => {
-  const { event } = setup();
+test('answers only in tool_input (pre-filled by the model) do not approve', () => {
+  const { cwd, id, event } = setup();
   const input = event('Approve');
   input.tool_input.answers = input.tool_response.answers;
   delete input.tool_response;
-  assert.deepEqual(recordGates(input), ['intent']);
+  assert.deepEqual(recordGates(input), []);
+  assert.equal(getWorkOrder(cwd, id).approvals, undefined);
 });
 
 test('untagged questions are ignored', () => {

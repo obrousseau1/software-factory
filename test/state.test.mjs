@@ -77,6 +77,7 @@ test('a step needs every earlier gate approved', () => {
   const { id } = newWorkOrder(repo, 'gated');
   assert.throws(() => setStep(repo, id, 'specs'), /intent is not approved/);
   approve(repo, id, 'intent');
+  setStep(repo, id, 'specs');
   assert.throws(() => setStep(repo, id, 'plan'), /specs is not approved/);
 });
 
@@ -86,9 +87,21 @@ test('approval covers the doc as it was; a later edit voids it', () => {
   writeFileSync(join(path, 'spec.md'), '### R-01: a\n');
   approve(repo, id, 'intent');
   approve(repo, id, 'specs');
+  setStep(repo, id, 'specs');
   assert.equal(setStep(repo, id, 'plan').step, 'plan');
   writeFileSync(join(path, 'spec.md'), '### R-01: b\n');
   assert.throws(() => setStep(repo, id, 'plan'), /spec\.md changed since the specs approval/);
+});
+
+test('steps move one forward or back, never skip ahead', () => {
+  const repo = tempRepo();
+  const { id, path } = newWorkOrder(repo, 'no skipping');
+  writeFileSync(join(path, 'spec.md'), '### R-01: a\n');
+  for (const gate of ['intent', 'specs', 'shred']) approve(repo, id, gate);
+  assert.throws(() => setStep(repo, id, 'final'), /Cannot skip from intent to final: next is specs/);
+  setStep(repo, id, 'specs');
+  setStep(repo, id, 'plan');
+  assert.equal(setStep(repo, id, 'intent').step, 'intent');
 });
 
 test('unknown gate is rejected', () => {

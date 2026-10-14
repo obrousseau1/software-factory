@@ -9,8 +9,8 @@ import { approve, woRoot } from './state.mjs';
 const TAG = /^\[gate (\S+) (\w+)\]/;
 const APPROVED = /^approve\b/i;
 
-// ponytail: answers' location in PostToolUse is undocumented; both are read. Drop tool_input once confirmed.
-const answersOf = (input) => input.tool_response?.answers ?? input.tool_input?.answers ?? {};
+// The result, not tool_input: input answers could be pre-filled by the model; the result is what the user picked.
+const answersOf = (input) => input.tool_response?.answers ?? {};
 
 // Returns the gates approved by this answer set.
 export function recordGates(input, now = new Date()) {

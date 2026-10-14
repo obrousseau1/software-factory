@@ -1,8 +1,9 @@
 // Work-order state under <repo>/.liftoff/wo/. Usage:
 //   node state.mjs new <idea...>   → prints { id, path }
 //   node state.mjs get <id>        → prints state.json
-//   node state.mjs step <id> <step> → records the current step, prints state.json; refuses to pass a gate
-//                                     the user has not approved (only record-gate.mjs writes approvals)
+//   node state.mjs step <id> <step> → records the current step, prints state.json; moves one step forward
+//                                     or back to any earlier step; refuses to pass a gate the user has not
+//                                     approved (only record-gate.mjs writes approvals)
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -87,6 +88,8 @@ function gateErrors(repo, state, step) {
 export function setStep(repo, id, step) {
   if (!STEPS.includes(step)) throw new Error(`Unknown step: ${step}. Steps: ${STEPS.join(', ')}`);
   const state = getWorkOrder(repo, id);
+  const furthest = Math.min(STEPS.indexOf(state.step) + 1, STEPS.length - 1);
+  if (STEPS.indexOf(step) > furthest) throw new Error(`Cannot skip from ${state.step} to ${step}: next is ${STEPS[furthest]}.`);
   const errors = gateErrors(repo, state, step);
   if (errors.length) throw new Error(`Cannot enter ${step}: ${errors.join('; ')}. Ask the gate question.`);
   return saveState(repo, { ...state, step });
