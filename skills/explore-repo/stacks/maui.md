@@ -1,0 +1,35 @@
+# maui
+
+## Match
+
+- A `.csproj` with `<UseMaui>true</UseMaui>`.
+- Still a match: extra class libraries, a test project, a solution file or none.
+- Not a match: Xamarin.Forms (no `UseMaui`), Blazor Hybrid without MAUI, WPF/WinUI only.
+
+## Defaults
+
+`<app>` = the MAUI csproj; `<tfm>` = its Windows target framework (e.g.
+`net10.0-windows10.0.19041.0`); `<tests>` = the test project, or the solution.
+
+| Key | Default |
+|-----|---------|
+| gate-format | `dotnet format <sln or app> --verify-no-changes` |
+| gate-lint | `none` *(analyzers run in the build)* |
+| gate-typecheck | `none` *(the build compiles)* |
+| gate-build | `dotnet build <app> -f <tfm>` |
+| gate-test | `dotnet test <tests>` |
+| run | `dotnet build <app> -t:Run -f <tfm>` |
+
+## req-tag
+
+xUnit: `[Trait("Req", "R-01")]`. NUnit: `[Property("Req", "R-01")]`. MSTest:
+`[TestProperty("Req", "R-01")]`.
+
+## ui-globs
+
+`**/*.xaml`, `**/*.xaml.cs`.
+
+## Watch
+
+- Building all target frameworks needs the Android/iOS workloads: build one framework.
+- Test projects usually reference a plain `netX.0` library, not the MAUI app.

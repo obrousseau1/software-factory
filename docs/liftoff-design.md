@@ -28,7 +28,7 @@ Status: design, ready to build. Decisions marked *(proposed)* are not confirmed 
 
 | # | Step | Who | Output | Human gate |
 |---|------|-----|--------|-----------|
-| 0 | Explore *(first run on a repo only)* | explorer | `.liftoff/profile.md` | — |
+| 0 | Explore *(first run on a repo only)* | profiler | `.liftoff/profile.md` | — |
 | 1 | Intent | liftoff ⇄ you, explorer on demand | `intent.md` + size verdict | ✋ interactive |
 | 2 | Specs | architect | `spec.md` with requirement IDs | ✋ approve |
 | 3 | Plan | architect | `plan.md` | — |
@@ -54,7 +54,8 @@ Liftoff is the **main session**, not a subagent. Everything else is a subagent s
 | Agent | Job | Writes | Model |
 |-------|-----|--------|-------|
 | **liftoff** (main) | Talks to you, routes work, owns state, amends living docs, manages worktrees | `.liftoff/**` | session model |
-| **explorer** | Maps the codebase; first pass writes the profile; answers "what exists?" | `profile.md` only | haiku; liftoff overrides to sonnet for the profile pass |
+| **explorer** | Answers "what exists?" about the code | nothing | haiku |
+| **profiler** | First run on a repo: writes the profile; stack proposal for unknown shapes | `profile.md`, `proposals/**` | sonnet |
 | **architect** | Brainstorms options, drafts specs, plan, shreds | nothing — returns drafts to liftoff | opus |
 | **twin** | Senior programmer; one half of the ping-pong pair | code + tests in its worktree | sonnet |
 | **spec-validator** | Code conforms to spec: every requirement done, nothing extra | nothing | sonnet |
@@ -122,7 +123,7 @@ it, then builds the next requirement.
 
 ```
 .liftoff/
-  profile.md                  stack, architecture, gate commands, conventions (explorer)
+  profile.md                  stack, architecture, gate commands, conventions (profiler)
   lessons.md                  fed after every work order (§10)
   wo/<nnn-slug>/
     state.json                step, shred statuses, round counters, worktree paths
@@ -163,7 +164,7 @@ one file plus the references the checks list.
 | Rule | Event | Applies to | Check |
 |------|-------|-----------|-------|
 | Standards on every edit | PostToolUse `Edit\|Write` | twin | Run profile's formatter + linter on the changed file; violation → feedback to the twin |
-| Read-only checkers | PreToolUse `Edit\|Write\|NotebookEdit` | explorer (except `profile.md`), architect, validators | Deny |
+| Read-only checkers | PreToolUse `Edit\|Write\|NotebookEdit` | explorer, profiler (except `profile.md`, `proposals/**`), architect, validators | Deny; fails closed |
 | Living docs owned by liftoff | PreToolUse `Edit\|Write` on `intent/spec/plan.md` | any subagent | Deny |
 | Changelog required | Stop | liftoff | Living doc body changed since last snapshot without a new changelog row → block |
 | Twin phase | PreToolUse `Edit\|Write` | twin | CHALLENGE: test edits may only add (no removed lines). REFACTOR: no test file edits. BUILD: production edit only once a failing test for the requirement exists |
@@ -183,7 +184,7 @@ Small, single-purpose, loaded on demand by agents through the Skill tool.
 | Skill | Used by | Does |
 |-------|---------|------|
 | `liftoff` | main | Entry point: thin step map; loads `steps/<step>.md` on entering a step |
-| `explore-repo` | explorer | Writes / refreshes `profile.md` |
+| `explore-repo` | profiler | Writes / refreshes `profile.md` |
 | `amend-doc` | liftoff | Edit a living doc + append changelog row |
 | `write-handoff` | twin | Fill `handoff.md` in the fixed format |
 | `run-gates` | twin, liftoff | Run profile's lint, typecheck, test; summarize |
@@ -226,7 +227,7 @@ and its own marketplace. Entry point: `/spaceport:liftoff`. Node.js is a prerequ
 software-factory/
   .claude-plugin/plugin.json
   .claude-plugin/marketplace.json
-  agents/        explorer.md, architect.md, twin.md, *-validator.md
+  agents/        explorer.md, profiler.md, architect.md, twin.md, *-validator.md
   skills/        liftoff/ (SKILL.md + steps/), amend-doc/, run-gates/, …
   hooks/         hooks.json
   scripts/       *.mjs (hook implementations)
@@ -237,11 +238,13 @@ software-factory/
 **Install script** (`node install/install.mjs <repo>`):
 1. Registers the marketplace and enables the plugin in `<repo>/.claude/settings.json`.
 2. Creates `.liftoff/` skeleton.
-3. Prints next step: run liftoff; first run triggers the explorer pass.
+3. Prints next step: run liftoff; first run triggers the profiler.
 
-**Profile.** First explorer pass writes `.liftoff/profile.md`: stack, architecture, folder roles,
-gate commands (format, lint, typecheck, test, run), test-naming convention for `R-xx`, UI file
-patterns. Every hook and agent reads stack facts from here.
+**Profile.** The profiler writes `.liftoff/profile.md`: flat frontmatter keys
+(`stack`, `gate-format|lint|typecheck|build|test`, `run`, `req-tag`, `ui-globs`; `none` = n/a) + architecture, folder
+roles, conventions. The profiler infers without running anything; liftoff runs the gates (`run-gates`) and
+re-spawns the profiler on failure (max 2). Known stacks are cue files (`skills/explore-repo/stacks/`), each
+with a fixture + eval; an unknown repo gets `stack: other` and a proposal in `.liftoff/proposals/<shape>/`.
 
 **Stacks** (for empty repos only): `.NET + React/TypeScript/Vite`, `MAUI`. Each template ships a
 starter repo and a pre-filled `profile.md`.
@@ -261,7 +264,7 @@ Three layers, from cheap and deterministic to costly and statistical.
 |-------|-------|-----|------|
 | **Scripts** | Every hook and the install script | `node:test` (built in, no deps). Feed a fixture hook-input JSON on stdin, assert exit code / decision JSON. Fixture repos for profile-dependent hooks | Every commit |
 | **Static checks** on agents + skills | Frontmatter valid (`name`, `description`, `tools`, `model`); every file a skill or step references exists; every skill an agent names exists; every agent name used by hooks exists; no `skills:` preload; size budget per `SKILL.md` / agent file (enforces progressive disclosure) | `node:test` over the plugin folder | Every commit |
-| **Behavioural evals** for agents + skills | Scenario per agent against a fixture repo, asserting on artifacts: explorer → correct gate commands in `profile.md`; twin → hooks pass, requirement covered; each validator → catches a seeded defect at the right severity; liftoff → reply follows the contract | Headless runs (`claude -p`) or `claude plugin eval` *(verify its format at milestone 1)*. LLM output varies: run N times, require a pass rate | On demand / before a release (costs tokens) |
+| **Behavioural evals** for agents + skills | Scenario per agent against a fixture repo, asserting on artifacts: profiler → correct gate commands in `profile.md`; twin → hooks pass, requirement covered; each validator → catches a seeded defect at the right severity; liftoff → reply follows the contract | Headless runs (`claude -p`) or `claude plugin eval` *(verify its format at milestone 1)*. LLM output varies: run N times, require a pass rate | On demand / before a release (costs tokens) |
 
 Agent and skill behaviour can't be unit-tested like code; the static checks and evals together are the
 closest equivalent.
@@ -329,3 +332,6 @@ None. Agent names are provisional (§7).
 | 2026-10-12 | Critical + Major block a round; standards-validator checks test relevance | Confirmed; stop low-value tests |
 | 2026-10-12 | Testing the factory: script tests, static checks, behavioural evals (§11b); agent names provisional | Factory must meet its own quality bar |
 | 2026-10-13 | `agent_type` confirmed namespaced (`spaceport:<name>`); evals granting Bash need WSL2 (no sandbox on native Windows) | Docs check during milestone 1 |
+| 2026-10-13 | Milestone 2: profile format, liftoff runs gates, unknown-shape proposals, first hook (read-only guard) | M2 planning |
+| 2026-10-14 | Explorer split: `profiler` (sonnet, writes profile) + `explorer` (haiku, read-only Q&A) | A per-spawn model override is persuasive, not enforced |
+| 2026-10-14 | `dotnet` stack (backend only); gate failures split into wrong command (fix, retry) vs repo red (no retry, ask user, never weaken) | .NET backends fell to `other`; retries could weaken gates |

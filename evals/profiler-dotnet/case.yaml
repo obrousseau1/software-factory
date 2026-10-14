@@ -1,0 +1,46 @@
+schema_version: "1.0"
+name: profiler-dotnet
+description: Profiler profiles a .NET-only backend, taking the CI test filter and the NUnit req-tag.
+tags: [profiler]
+context:
+  add_dirs: [fixture]
+execution:
+  prompt: |
+    Spawn the spaceport profiler agent with the Agent tool, with this exact prompt:
+    "Profile pass. Repo root: evals/profiler-dotnet/fixture under the spaceport plugin root (two levels above your
+    explore-repo skill's base directory). Read-only; read nothing else in the plugin.
+    Profile: .liftoff/profile.md in the current working directory."
+    Then reply with the profiler's report, verbatim.
+  max_turns: 30
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Write, Skill, Agent]
+runs: 3
+graders:
+  - type: file_exists
+    name: profile-written
+    path: .liftoff/profile.md
+  - type: regex
+    name: stack
+    target: { source: file, path: .liftoff/profile.md }
+    pattern: '^stack: dotnet\s*$'
+    flags: m
+  - type: regex
+    name: build-sln
+    target: { source: file, path: .liftoff/profile.md }
+    pattern: '^gate-build: .*dotnet build.*Orders\.sln'
+    flags: m
+  - type: regex
+    name: test-ci-filter
+    target: { source: file, path: .liftoff/profile.md }
+    pattern: '^gate-test: .*dotnet test.*Category!=Integration'
+    flags: m
+  - type: regex
+    name: req-tag-nunit
+    target: { source: file, path: .liftoff/profile.md }
+    pattern: '^req-tag: .*Property'
+    flags: m
+  - type: regex
+    name: no-ui
+    target: { source: file, path: .liftoff/profile.md }
+    pattern: '^ui-globs: none\s*$'
+    flags: m

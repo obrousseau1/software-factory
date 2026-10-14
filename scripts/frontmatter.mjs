@@ -1,4 +1,4 @@
-// Minimal frontmatter reader: top-level `key: value` lines only. Enough for structural checks.
+// Minimal frontmatter reader: top-level `key: value` lines only. Enough for structural checks and profile.md.
 export function frontmatter(markdown) {
   const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return {};

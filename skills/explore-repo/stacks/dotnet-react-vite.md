@@ -1,0 +1,38 @@
+# dotnet-react-vite
+
+## Match
+
+- A `.sln`/`.slnx` or `.csproj` (ASP.NET Core or class libraries), **and** a `package.json` with
+  `vite` and `react`, usually in a sub-folder (`web/`, `client/`, `src/*.Web/ClientApp`).
+- Still a match: several .NET projects, the React app inside a .NET project folder, npm/yarn
+  instead of pnpm.
+- Not a match: .NET only (no React app → `dotnet`), React without .NET, Next.js or Angular.
+
+## Defaults
+
+Use only where the repo declares nothing better. `<sln>` = the solution; `<web>` = the React folder.
+Package manager from the lock file (`pnpm-lock.yaml` → `pnpm --dir <web>`, `package-lock.json` →
+`npm --prefix <web> run`, `yarn.lock` → `yarn --cwd <web>`).
+
+| Key | Default |
+|-----|---------|
+| gate-format | `dotnet format <sln> --verify-no-changes && <pm> format` *(only if a `format` script checks)* |
+| gate-lint | `<pm> lint` |
+| gate-typecheck | `<pm> typecheck` (or `tsc -b` via the package manager) |
+| gate-build | `dotnet build <sln> && <pm> build` |
+| gate-test | `dotnet test <sln> && <pm> test` (non-watch, e.g. `vitest run`) |
+| run | `dotnet run --project <api csproj>` *(the web dev server is started separately)* |
+
+## req-tag
+
+xUnit: `[Trait("Req", "R-01")]`. NUnit: `[Property("Req", "R-01")]`. MSTest:
+`[TestProperty("Req", "R-01")]`. Vitest/Jest: test name starts with `R-01:`.
+
+## ui-globs
+
+`<web>/src/**/*.tsx`, `<web>/src/**/*.css`.
+
+## Watch
+
+- A `test` script without `run` starts Vitest in watch mode: use `vitest run`.
+- Test categories CI excludes (manual, integration) must be excluded in `gate-test` too.

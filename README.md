@@ -3,7 +3,7 @@
 `spaceport`: a Claude Code plugin that runs an agent software factory. Its orchestrator, **liftoff**,
 turns a one-line idea into reviewed, tested code. Design: [docs/liftoff-design.md](docs/liftoff-design.md).
 
-Status: milestone 1 — plugin skeleton, install, liftoff step map. Steps are stubs.
+Status: milestone 2 — profiler writes `.liftoff/profile.md`; liftoff verifies it with `run-gates`. Later steps are stubs.
 
 ## Install into a repo
 
@@ -23,5 +23,5 @@ in `<repo>` and run `/spaceport:liftoff <idea>`.
 ```
 node --test                                                   # scripts + static checks
 claude plugin validate --strict .                             # manifests
-claude plugin eval . --ablation none --trust-plugin           # behaviour (costs model usage)
+claude plugin eval . --ablation none --trust-plugin --allow-tools Write   # behaviour (costs model usage)
 ```
