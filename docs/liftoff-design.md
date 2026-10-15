@@ -190,6 +190,7 @@ one file plus the references the checks list.
 | Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json` → deny |
 | Round cap | PreToolUse `Agent` | everyone | `guard-spawn`: twin only while a shred is in work, validator only while one is validating; escalated shred → deny. No work order in the repo → pass |
 | Validator writes | PreToolUse `Edit|Write` | validators | Only its own `findings/r<k>-<role>.md` |
+| Liftoff writes no code | PreToolUse `Edit|Write` | liftoff | Target inside a shred worktree not yet landed → deny |
 | Ledger | SubagentStop | all | Sum token usage + elapsed time from `agent_transcript_path` → append to `ledger.md` |
 
 ---
@@ -358,3 +359,4 @@ None. Agent names are provisional (§7).
 | 2026-10-14 | Milestone 4: `shred.mjs` plans turns, opens a sibling worktree (`<repo>.spaceport/`, refused on a red base), commits each turn; `guard-twin` (phases, worktree, test lines) + `guard-turn` (SubagentStop); profile key `test-globs`; `trace-reqs` folded into the turn check | M4 planning; user picked profile globs, red-base refusal, sibling worktrees |
 | 2026-10-15 | Milestone 5: validators write own findings files; `validate.mjs` round/verdict/summary; blocking findings → `F` doubts + one fix turn; shreds land on `spaceport/<id>`; `guard-spawn` enforces the round cap; final = summary only; escalation = Stop / Amend spec; UX deep deferred; `close-worktree` dropped (script) | M5 planning; user picked wo branch, summary-only final, escalation options, deferring deep |
 | 2026-10-15 | Validator-licensed test removal: `## Remove` in a findings file lets the fix turn delete exactly the quoted test lines | Standards findings asked to remove duplicate tests the twin guard forbids deleting |
+| 2026-10-15 | Liftoff denied writes in open shred worktrees | Sandbox: liftoff deleted tests a twin escalated, bypassing the twin guard |

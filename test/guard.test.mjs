@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { decide } from '../scripts/guard-readonly.mjs';
+import { openShred } from '../scripts/shred.mjs';
+import { ID, makeRepo } from './shred-repo.mjs';
 
 const script = fileURLToPath(new URL('../scripts/guard-readonly.mjs', import.meta.url));
 const cwd = join(process.cwd(), 'repo');
@@ -92,4 +94,12 @@ test('validator may write only its own findings file', () => {
   assert.ok(isDenied(decide(input('spaceport:spec-validator', '.liftoff/wo/001-x/shreds/1/findings/r2-security-validator.md'))));
   assert.ok(isDenied(decide(input('spaceport:spec-validator', '.liftoff/wo/001-x/shreds/1/handoff.md'))));
   assert.ok(isDenied(decide(input('spaceport:ux-validator', 'src/App.tsx'))));
+});
+
+test('liftoff may not write in an open shred worktree, but may in the main repo', () => {
+  const repo = makeRepo();
+  const { worktree } = openShred(repo, ID, 1);
+  const main = (path) => decide({ cwd: repo, tool_input: { file_path: path } });
+  assert.ok(isDenied(main(join(worktree, 'tests', 'calc.test.js'))));
+  assert.equal(main(join(repo, 'src', 'calc.js')), null);
 });

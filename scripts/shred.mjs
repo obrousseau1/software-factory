@@ -197,6 +197,7 @@ function doubtRows(md) {
 // Problems with the turn in progress; [] = complete. Gates run last, only when everything else passes.
 export function checkTurn(repo, id, n) {
   const shred = findShred(getWorkOrder(repo, id), n);
+  if (shred.status !== 'work') return [`Shred ${n} is ${shred.status}: no turn to check.`];
   if (shred.turn < 0) return ['No turn started: run shred.mjs turn.'];
   const profile = readProfile(profilePath(repo));
   const stray = mainStatus(repo).filter((line) => !shred.mainStatus.includes(line));

@@ -1,9 +1,11 @@
 // PreToolUse hook: restricted roles may write only their allowed paths (roles.mjs WRITE_LIMITS); no subagent
-// may write a living doc (intent/spec/plan.md); nobody may hand-edit script-owned state. Fails closed.
-import { readFileSync } from 'node:fs';
-import { relative, resolve } from 'node:path';
+// may write a living doc (intent/spec/plan.md); nobody may hand-edit script-owned state; liftoff never writes in an
+// open shred's worktree (twins own it). Fails closed.
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { WRITE_LIMITS, bare } from './roles.mjs';
+import { getWorkOrder, woRoot } from './state.mjs';
 
 const deny = (reason) => ({
   hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason },
@@ -27,13 +29,30 @@ function isAllowed(rel, allowed) {
   });
 }
 
+// Inside the worktree of a shred not yet landed.
+function inShredWorktree(repo, absolute) {
+  const root = woRoot(repo);
+  if (!existsSync(root)) return false;
+  return readdirSync(root)
+    .filter((id) => existsSync(join(root, id, 'state.json')))
+    .flatMap((id) => getWorkOrder(repo, id).shreds ?? [])
+    .filter((shred) => shred.status !== 'landed' && shred.worktree)
+    .some((shred) => {
+      const rel = relative(shred.worktree, absolute);
+      return rel && !rel.startsWith('..') && !isAbsolute(rel);
+    });
+}
+
 // Returns the hook's JSON reply, or null to let the call through.
 export function decide(input) {
   const role = bare(input.agent_type);
   const target = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
   const absolute = target && input.cwd ? resolve(input.cwd, target) : null;
   if (absolute && SCRIPT_OWNED.test(normalize(absolute))) return deny('Written by spaceport scripts only (state.mjs, hooks).');
-  if (!role) return null;
+  if (!role) {
+    const liftoffInWorktree = absolute && inShredWorktree(input.cwd, absolute);
+    return liftoffInWorktree ? deny('liftoff never writes code: twins own the shred worktree. Route the change through a twin turn or ask the user.') : null;
+  }
   const allowed = WRITE_LIMITS[role];
 
   if (!absolute) return deny(`${role}: cannot resolve the target path, write denied.`);
