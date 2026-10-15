@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { frontmatter } from '../scripts/frontmatter.mjs';
 import { Role } from '../scripts/roles.mjs';
+import { TEMPLATES, fill, stacks } from '../scripts/scaffold.mjs';
+import { validateProfile } from '../scripts/profile.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const readJson = (path) => JSON.parse(readFileSync(join(root, path), 'utf8'));
@@ -79,6 +81,15 @@ test('every spaceport:<name> in skills and agents is a skill or an agent', () =>
   const names = new Set([...skillDirs, ...Object.values(Role)]);
   for (const md of [...markdownIn(join(root, 'skills')), ...markdownIn(join(root, 'agents'))]) {
     for (const [, name] of readFileSync(md, 'utf8').matchAll(/spaceport:([a-z-]+)/g)) assert.ok(names.has(name), `${md} → ${name}`);
+  }
+});
+
+test('every stack template is a known stack with a valid profile', () => {
+  for (const stack of stacks()) {
+    assert.ok(existsSync(join(root, 'skills', 'explore-repo', 'stacks', `${stack}.md`)), `cue file for ${stack}`);
+    const meta = frontmatter(fill(readFileSync(join(TEMPLATES, stack, 'profile.md'), 'utf8'), 'Demo'));
+    assert.equal(meta.stack, stack);
+    assert.deepEqual(validateProfile(meta), [], stack);
   }
 });
 

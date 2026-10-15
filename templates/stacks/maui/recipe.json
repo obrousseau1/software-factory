@@ -1,0 +1,18 @@
+{
+  "steps": [
+    "dotnet new sln -n {{Name}}",
+    "dotnet new gitignore",
+    "dotnet new maui -n {{Name}} -o src/{{Name}} --no-restore",
+    {
+      "file": "src/{{Name}}/{{Name}}.csproj",
+      "pattern": "<TargetFrameworks>[\\s\\S]*?(net[\\d.]+-windows[\\d.]+)</TargetFrameworks>",
+      "with": "<TargetFrameworks>$1</TargetFrameworks>"
+    },
+    "dotnet new classlib -n {{Name}}.Core -o src/{{Name}}.Core",
+    "dotnet new xunit -n {{Name}}.Core.Tests -o tests/{{Name}}.Core.Tests",
+    "dotnet add tests/{{Name}}.Core.Tests reference src/{{Name}}.Core",
+    "dotnet add src/{{Name}} reference src/{{Name}}.Core",
+    "dotnet sln {{Name}}.slnx add src/{{Name}} src/{{Name}}.Core tests/{{Name}}.Core.Tests",
+    "dotnet format {{Name}}.slnx"
+  ]
+}

@@ -38,8 +38,9 @@ Status: design, ready to build. Decisions marked *(proposed)* are not confirmed 
 
 **Sizing (step 1).** Liftoff decides:
 - **Feature** → one work order on the current repo.
-- **App** → repo scaffolded from a stack template, then N work orders. The first is always a walking
-  skeleton (builds, one screen/endpoint, one passing test).
+- **App** → empty repo only. Repo scaffolded from a stack template (green base, committed), then N
+  work orders listed in `.liftoff/roadmap.md`. The first is always a walking skeleton (builds, one
+  screen/endpoint, one passing test); final approval offers the next item.
 
 **Design round-trip (steps 2-4).** Subagents cannot ask the user. The architect's first spawn returns
 options, a recommendation and open questions; liftoff asks them with `AskUserQuestion`, then re-spawns it
@@ -136,6 +137,7 @@ it, then builds the next requirement.
 .liftoff/
   profile.md                  stack, architecture, gate commands, conventions (profiler)
   lessons.md                  fed after every work order (§10)
+  roadmap.md                  app only: one checklist item per work order (liftoff)
   wo/<nnn-slug>/
     state.json                step, shred statuses, round counters, worktree paths
     intent.md                 ┐
@@ -265,8 +267,10 @@ roles, conventions. The profiler infers without running anything; liftoff runs t
 re-spawns the profiler on failure (max 2). Known stacks are cue files (`skills/explore-repo/stacks/`), each
 with a fixture + eval; an unknown repo gets `stack: other` and a proposal in `.liftoff/proposals/<shape>/`.
 
-**Stacks** (for empty repos only): `.NET + React/TypeScript/Vite`, `MAUI`. Each template ships a
-starter repo and a pre-filled `profile.md`.
+**Stacks** (for empty repos only): `.NET + React/TypeScript/Vite`, `MAUI` (Windows target only).
+Each template is a `recipe.json` (shell commands running the official generators, plus regex
+replaces) and a pre-filled `profile.md`; `scripts/scaffold.mjs` runs it and commits. Generators
+track the installed SDK; they need network.
 
 **Worktrees.** Used whenever possible: one per shred, created and removed by liftoff
 (`git worktree`). The built-in agent `isolation: worktree` is not used for twins — it creates a new
@@ -336,6 +340,7 @@ None. Agent names are provisional (§7).
 | 5 | Validators, loop, round cap, escalation | Seeded defect caught, routed, fixed; 4th round denied |
 | 6 | Ledger hook, postmortem, `lessons.md` | Ledger shows real tokens/time per run; lessons written |
 | 7 | Stack templates for empty repos | Idea → new app walking skeleton on both stacks |
+| 8 | Solo baseline benchmark | One agent builds a landed shred from the same spec + base commit in its own worktree; the same validators grade it once. Report: tokens, time, $, blocking findings, tests per `R-xx`, twins vs solo |
 
 ---
 
@@ -363,3 +368,5 @@ None. Agent names are provisional (§7).
 | 2026-10-15 | Validator-licensed test removal: `## Remove` in a findings file lets the fix turn delete exactly the quoted test lines | Standards findings asked to remove duplicate tests the twin guard forbids deleting |
 | 2026-10-15 | Liftoff denied writes in open shred worktrees | Sandbox: liftoff deleted tests a twin escalated, bypassing the twin guard |
 | 2026-10-15 | Milestone 6: ledger hook (one row per agent id, totals); postmortem after final approval; lessons tagged per role, inlined into twin/validator prompts | M6 planning; user picked role-tagged lessons, prompt-only postmortem |
+| 2026-10-15 | Milestone 8: solo baseline benchmark (cost + quality, twins vs one agent) | User: prove the factory's cost buys quality |
+| 2026-10-15 | Milestone 7: `scaffold.mjs` runs a stack recipe (official generators) into an empty repo, writes the profile, commits; template = green base, skeleton built by twins; `.liftoff/roadmap.md` splits an app into work orders | M7 planning; user picked generators, green base, roadmap file, current empty repo |

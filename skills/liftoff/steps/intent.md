@@ -10,9 +10,15 @@ Shape what the user wants, before any solution. `<wo>` is the work-order folder,
    question. Put what matters, with `path:line`, under Context. No design yet: that is the architect's.
 4. **Size**:
    - `feature`: changes this repo; one work order.
-   - `app`: a new standalone product. Scaffolding and splitting into work orders come in milestone 7;
-     for now it runs as one work order whose first requirement is a walking skeleton. Say so in the
-     status line.
+   - `app`: a new standalone product. Only in an empty repo (`scaffold.mjs empty` prints `true`);
+     otherwise reply ⚠️ asking to run liftoff in an empty repo, and stop.
+     - Ask with `AskUserQuestion` for the stack (`dotnet-react-vite`, `maui`) and a PascalCase name.
+     - Write `.liftoff/roadmap.md`: `# Roadmap` then one `- [ ] <one-line idea>` per work order, in
+       order; the first is the walking skeleton (builds, one screen/endpoint, one passing test).
+     - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.mjs" run <stack> <Name>`, then invoke
+       `spaceport:run-gates`. A failure or any ❌ → reply ⛔ with the error, and stop.
+     - This work order is roadmap item 1: the intent's Outcome is the skeleton; later items go
+       under Out of scope.
 5. **Gate** `[gate <id> intent]`: ask with `AskUserQuestion` to approve the intent; put the filled
    template in the option preview. Options: Approve, Change. On a change, apply it and ask again.
 6. **Approved**: write `<wo>/intent.md` from the template with the `spaceport:amend-doc` skill

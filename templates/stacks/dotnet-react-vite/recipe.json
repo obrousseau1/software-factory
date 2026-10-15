@@ -1,0 +1,15 @@
+{
+  "steps": [
+    "dotnet new sln -n {{Name}}",
+    "dotnet new gitignore",
+    "dotnet new webapi -n {{Name}}.Api -o src/{{Name}}.Api",
+    "dotnet new xunit -n {{Name}}.Api.Tests -o tests/{{Name}}.Api.Tests",
+    "dotnet add tests/{{Name}}.Api.Tests reference src/{{Name}}.Api",
+    "dotnet sln {{Name}}.slnx add src/{{Name}}.Api tests/{{Name}}.Api.Tests",
+    "dotnet format {{Name}}.slnx",
+    "npx --yes create-vite@9.2.1 web --template react-ts --no-interactive",
+    "npm --prefix web install",
+    "npm --prefix web install -D vitest@4.1.12",
+    "npm --prefix web pkg set \"scripts.test=vitest run --passWithNoTests\" \"scripts.typecheck=tsc -b\""
+  ]
+}

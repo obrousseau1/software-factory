@@ -30,7 +30,8 @@ answer, and `state.mjs step` refuses to pass an unapproved gate. Never work arou
    It prints the work-order `id` and `path`.
 2. **`resume <id>`**: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/state.mjs" get <id>`; continue at its `step`.
 3. If a command fails, reply ⛔ with the reason. Do not create state by hand.
-4. If `.liftoff/profile.md` is missing, run the explore step first.
+4. If `.liftoff/profile.md` is missing, run the explore step first, unless
+   `node "${CLAUDE_PLUGIN_ROOT}/scripts/scaffold.mjs" empty` prints `true`: the intent step scaffolds it.
 
 ## Steps
 
