@@ -44,3 +44,8 @@ graders:
     target: { source: file, path: .liftoff/profile.md }
     pattern: '^ui-globs: none\s*$'
     flags: m
+  - type: regex
+    name: test-globs
+    target: { source: file, path: .liftoff/profile.md }
+    pattern: '^test-globs: .*tests'
+    flags: m

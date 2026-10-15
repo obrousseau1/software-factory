@@ -56,7 +56,7 @@ export function getWorkOrder(repo, id) {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
-function saveState(repo, state) {
+export function saveState(repo, state) {
   writeFileSync(join(woRoot(repo), state.id, 'state.json'), JSON.stringify(state, null, 2) + '\n');
   return state;
 }

@@ -44,3 +44,8 @@ graders:
     target: { source: file, path: .liftoff/profile.md }
     pattern: '^req-tag: .*Trait'
     flags: m
+  - type: regex
+    name: setup-pnpm-frozen
+    target: { source: file, path: .liftoff/profile.md }
+    pattern: '^setup: .*pnpm.*install.*--frozen-lockfile'
+    flags: m

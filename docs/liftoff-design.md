@@ -135,7 +135,8 @@ it, then builds the next requirement.
     intent.md                 ┐
     spec.md                   ├ living docs — amended only by liftoff, each ends with ## Changelog
     plan.md                   ┘
-    shreds/<n>/handoff.md     twin continuity
+    shreds/<n>/handoff.md     twin continuity (frontmatter: turn, twin, phase, challenge, build)
+    shreds/<n>/turns/<k>.md   handoff as turn k left it (archived by shred.mjs turn)
     shreds/<n>/findings-r<k>.md
     ledger.md                 time + tokens per subagent run (hook-written)
     postmortem.md
@@ -173,11 +174,11 @@ one file plus the references the checks list.
 | Read-only checkers | PreToolUse `Edit\|Write\|NotebookEdit` | explorer, profiler (except `profile.md`, `proposals/**`), architect, validators | Deny; fails closed |
 | Living docs owned by liftoff | PreToolUse `Edit\|Write` on `intent/spec/plan.md` | any subagent | Deny |
 | Changelog required | Stop | liftoff | Living doc body changed since last snapshot without a new changelog row → block |
-| Twin phase | PreToolUse `Edit\|Write` | twin | CHALLENGE: test edits may only add (no removed lines). REFACTOR: no test file edits. BUILD: production edit only once a failing test for the requirement exists |
-| Stay in the worktree | PreToolUse `Edit\|Write\|Bash` | twin | Path outside assigned worktree → deny |
-| Turn complete | SubagentStop | twin | All gates green; every doubt from the incoming `handoff.md` has a resolution; new `handoff.md` written |
+| Twin phase | PreToolUse `Edit\|Write` | twin | No phase removes a test line committed by an earlier turn (multiset vs `HEAD`). REFACTOR: no test file edits. BUILD: production edit only once a changed test references the requirement. Test files = profile `test-globs` |
+| Stay in the worktree | PreToolUse `Edit\|Write` | twin | Path outside the active shred's worktree (except its `handoff.md`) → deny. Bash is not parsed: the turn check flags main-repo changes made during the turn |
+| Turn complete | SubagentStop | twin | `shred.mjs` check: handoff at this turn and its last phase; every incoming open doubt resolved; no earlier test line removed; no main-repo change; gates green. Blocks ≤3 times per turn; `shred.mjs turn` refuses to advance until it passes |
 | UX deep evidence | SubagentStop | ux-validator at `deep` | One screenshot per UI acceptance criterion exists |
-| Shred complete | SubagentStop | twin, when declaring done | Gates green, no `TODO`/`NotImplemented` in diff, every shred `R-xx` referenced by a test |
+| Shred complete | SubagentStop | twin, final turn | Gates green, no `TODO`/`NotImplemented` in diff, every shred `R-xx` referenced by a test |
 | Human gates | PostToolUse `AskUserQuestion` | liftoff | Question tagged `[gate <id> <gate>]` answered `Approve…` → approval + doc hash in `state.json`; every answer logged to `gates.log`. `state.mjs step` refuses a step whose earlier gates are unapproved or whose doc changed since |
 | Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json` → deny |
 | Round cap | PreToolUse `Agent` | liftoff | Spawning a twin for round 4 → deny |
@@ -195,11 +196,10 @@ Small, single-purpose, loaded on demand by agents through the Skill tool.
 | `explore-repo` | profiler | Writes / refreshes `profile.md` |
 | `amend-doc` | liftoff | Edit a living doc + append changelog row |
 | `draft-docs` | architect | Brainstorm questions, draft `spec.md` / `plan.md` from templates |
-| `write-handoff` | twin | Fill `handoff.md` in the fixed format |
-| `run-gates` | twin, liftoff | Run profile's lint, typecheck, test; summarize |
-| `trace-reqs` | twin, spec-validator | Map `R-xx` → tests; list gaps |
+| `write-handoff` | twin | Fill `handoff.md` in the fixed format; run the turn check (`shred.mjs check`) |
+| `run-gates` | liftoff | Run profile's lint, typecheck, test; summarize |
 | `log-finding` | validators | Append a graded finding in the fixed format |
-| `open-worktree` / `close-worktree` | liftoff | Create / merge / remove a shred's worktree |
+| `close-worktree` | liftoff | Merge / remove a shred's worktree (M5); opening is `shred.mjs open` |
 | `report-back` | every subagent | Fixed, short return format to liftoff |
 | `postmortem` | liftoff | Write `postmortem.md`, feed `lessons.md` |
 
@@ -250,7 +250,7 @@ software-factory/
 3. Prints next step: run liftoff; first run triggers the profiler.
 
 **Profile.** The profiler writes `.liftoff/profile.md`: flat frontmatter keys
-(`stack`, `gate-format|lint|typecheck|build|test`, `run`, `req-tag`, `ui-globs`; `none` = n/a) + architecture, folder
+(`stack`, `setup`, `gate-format|lint|typecheck|build|test`, `run`, `req-tag`, `test-globs`, `ui-globs`; `none` = n/a) + architecture, folder
 roles, conventions. The profiler infers without running anything; liftoff runs the gates (`run-gates`) and
 re-spawns the profiler on failure (max 2). Known stacks are cue files (`skills/explore-repo/stacks/`), each
 with a fixture + eval; an unknown repo gets `stack: other` and a proposal in `.liftoff/proposals/<shape>/`.
@@ -348,3 +348,4 @@ None. Agent names are provisional (§7).
 | 2026-10-14 | Milestone 3: architect questions round-trip; one spawn for plan + shreds; changelog Stop hook with snapshot; app verdict runs as one work order until M7 | M3 planning |
 | 2026-10-14 | Human gates enforced: approvals written only from the user's `AskUserQuestion` answer (hook), checked by `state.mjs step` with a doc hash; Decisions table gains a Rejected column | Gates were prompt-only (principle 2) |
 | 2026-10-14 | `state.mjs step` moves one step forward (or back to any earlier); amending an approved doc sends liftoff back to its gate (spec change also redoes plan + shred) | Manual test: liftoff jumped to `final`; post-approval spec edit had no recovery path |
+| 2026-10-14 | Milestone 4: `shred.mjs` plans turns, opens a sibling worktree (`<repo>.spaceport/`, refused on a red base), commits each turn; `guard-twin` (phases, worktree, test lines) + `guard-turn` (SubagentStop); profile key `test-globs`; `trace-reqs` folded into the turn check | M4 planning; user picked profile globs, red-base refusal, sibling worktrees |

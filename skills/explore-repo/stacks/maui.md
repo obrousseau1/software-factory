@@ -13,6 +13,7 @@
 
 | Key | Default |
 |-----|---------|
+| setup | `none` *(`dotnet build` restores)* |
 | gate-format | `dotnet format <sln or app> --verify-no-changes` |
 | gate-lint | `none` *(analyzers run in the build)* |
 | gate-typecheck | `none` *(the build compiles)* |
@@ -24,6 +25,10 @@
 
 xUnit: `[Trait("Req", "R-01")]`. NUnit: `[Property("Req", "R-01")]`. MSTest:
 `[TestProperty("Req", "R-01")]`.
+
+## test-globs
+
+The test projects' folders, e.g. `<Name>.Tests/**`.
 
 ## ui-globs
 

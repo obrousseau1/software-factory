@@ -16,6 +16,7 @@ Package manager from the lock file (`pnpm-lock.yaml` → `pnpm --dir <web>`, `pa
 
 | Key | Default |
 |-----|---------|
+| setup | `<pm> install` with its lockfile flag: `pnpm --dir <web> install --frozen-lockfile`, `npm ci`, `yarn install --immutable` |
 | gate-format | `dotnet format <sln> --verify-no-changes && <pm> format` *(only if a `format` script checks)* |
 | gate-lint | `<pm> lint` |
 | gate-typecheck | `<pm> typecheck` (or `tsc -b` via the package manager) |
@@ -27,6 +28,10 @@ Package manager from the lock file (`pnpm-lock.yaml` → `pnpm --dir <web>`, `pa
 
 xUnit: `[Trait("Req", "R-01")]`. NUnit: `[Property("Req", "R-01")]`. MSTest:
 `[TestProperty("Req", "R-01")]`. Vitest/Jest: test name starts with `R-01:`.
+
+## test-globs
+
+The .NET test projects' folders plus the web test files, e.g. `tests/**, <web>/src/**/*.test.ts, <web>/src/**/*.test.tsx`.
 
 ## ui-globs
 

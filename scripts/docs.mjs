@@ -12,7 +12,7 @@ export const UX_LEVELS = ['none', 'simple', 'deep'];
 
 const CHANGELOG = /^## Changelog\s*$/m;
 
-const section = (md, heading) => {
+export const section = (md, heading) => {
   const start = md.search(new RegExp(`^## ${heading}\\s*$`, 'm'));
   if (start < 0) return '';
   const rest = md.slice(start).split(/\r?\n/).slice(1).join('\n');

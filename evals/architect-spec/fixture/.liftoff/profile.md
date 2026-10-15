@@ -1,5 +1,6 @@
 ---
 stack: dotnet
+setup: none
 gate-format: dotnet format Orders.sln --verify-no-changes
 gate-lint: none
 gate-typecheck: none
@@ -7,6 +8,7 @@ gate-build: dotnet build Orders.sln
 gate-test: dotnet test Orders.sln --filter "Category!=Integration"
 run: dotnet run --project src/Orders.Api/Orders.Api.csproj
 req-tag: NUnit [Property("Req", "R-01")]
+test-globs: tests/**
 ui-globs: none
 ---
 

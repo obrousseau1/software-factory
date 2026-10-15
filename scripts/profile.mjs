@@ -2,15 +2,15 @@
 //   node profile.mjs check [file]   → prints { ok, errors }; exit 1 when invalid
 //   node profile.mjs gates [file]   → prints { <gate>: <command> }, `none` gates left out
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, matchesGlob } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { frontmatter } from './frontmatter.mjs';
 
 export const NONE = 'none';
 export const GATES = ['format', 'lint', 'typecheck', 'build', 'test'];
 
-const KEYS = ['stack', ...GATES.map((gate) => `gate-${gate}`), 'run', 'req-tag', 'ui-globs'];
-const REQUIRED = ['stack', 'gate-build', 'gate-test', 'req-tag'];
+const KEYS = ['stack', 'setup', ...GATES.map((gate) => `gate-${gate}`), 'run', 'req-tag', 'test-globs', 'ui-globs'];
+const REQUIRED = ['stack', 'gate-build', 'gate-test', 'req-tag', 'test-globs'];
 
 export function profilePath(repo) {
   return join(repo, '.liftoff', 'profile.md');
@@ -31,6 +31,11 @@ export function gateCommands(meta) {
   return Object.fromEntries(GATES
     .map((gate) => [gate, meta[`gate-${gate}`]])
     .filter(([, command]) => command && command !== NONE));
+}
+
+// Repo-relative path, `/` separators.
+export function isTest(meta, rel) {
+  return meta['test-globs'].split(',').some((glob) => matchesGlob(rel, glob.trim()));
 }
 
 function main([command, file = profilePath(process.cwd())]) {

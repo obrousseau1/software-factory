@@ -5,13 +5,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { gateCommands, readProfile, validateProfile } from '../scripts/profile.mjs';
+import { gateCommands, isTest, readProfile, validateProfile } from '../scripts/profile.mjs';
 
 const script = fileURLToPath(new URL('../scripts/profile.mjs', import.meta.url));
 const expected = fileURLToPath(new URL('./expected-profiles', import.meta.url));
 
 const valid = {
   stack: 'maui',
+  setup: 'none',
   'gate-format': 'dotnet format --verify-no-changes',
   'gate-lint': 'none',
   'gate-typecheck': 'none',
@@ -19,6 +20,7 @@ const valid = {
   'gate-test': 'dotnet test',
   run: 'none',
   'req-tag': '[Trait("Req", "R-01")]',
+  'test-globs': 'tests/**, **/*Tests.cs',
   'ui-globs': '**/*.xaml',
 };
 
@@ -40,6 +42,16 @@ test('missing key is reported', () => {
 
 test('required key cannot be none', () => {
   assert.deepEqual(validateProfile({ ...valid, 'gate-test': 'none' }), ['gate-test cannot be none']);
+});
+
+test('test-globs cannot be none', () => {
+  assert.deepEqual(validateProfile({ ...valid, 'test-globs': 'none' }), ['test-globs cannot be none']);
+});
+
+test('isTest matches any of the comma-separated globs', () => {
+  assert.ok(isTest(valid, 'tests/A/B.cs'));
+  assert.ok(isTest(valid, 'src/App/AppTests.cs'));
+  assert.ok(!isTest(valid, 'src/App/App.cs'));
 });
 
 test('gates skip none, keep order', () => {

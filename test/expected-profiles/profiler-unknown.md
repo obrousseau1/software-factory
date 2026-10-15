@@ -1,5 +1,6 @@
 ---
 stack: other
+setup: none
 gate-format: test -z "$(gofmt -l .)"
 gate-lint: go vet ./...
 gate-typecheck: none
@@ -7,6 +8,7 @@ gate-build: go build ./...
 gate-test: go test ./...
 run: go run .
 req-tag: Go test name contains the ID, e.g. TestR01_Greet, plus a // R-01 comment
+test-globs: **/*_test.go
 ui-globs: none
 ---
 
