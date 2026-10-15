@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { decide as guard } from '../scripts/guard-twin.mjs';
 import { decide as stop } from '../scripts/guard-turn.mjs';
 import { MAX_BLOCKS, handoffPath, nextTurn, openShred } from '../scripts/shred.mjs';
-import { getWorkOrder } from '../scripts/state.mjs';
+import { getWorkOrder, saveState } from '../scripts/state.mjs';
 import { ID, SEED_TEST, TEST_FILE, makeRepo, setPhase, write } from './shred-repo.mjs';
 
 const script = fileURLToPath(new URL('../scripts/guard-twin.mjs', import.meta.url));
@@ -94,4 +94,12 @@ test('stop passes when the turn is complete; other agents never blocked', () => 
   assert.equal(stop({ agent_type: 'twin', cwd: worktree }), null);
   assert.equal(stop({ agent_type: 'architect', cwd: repo }), null);
   assert.ok(readFileSync(handoffPath(repo, ID, 1), 'utf8').includes('phase: BUILD'));
+});
+
+test('a validator-licensed test line may be removed; others still denied', () => {
+  const { repo, worktree } = inTurn1();
+  const state = getWorkOrder(repo, ID);
+  saveState(repo, { ...state, shreds: state.shreds.map((s) => ({ ...s, licenses: { [TEST_FILE]: [SEED_TEST] } })) });
+  assert.equal(guard(writeIn(worktree, TEST_FILE, 'R-01 adds\n')), null);
+  assert.ok(isDenied(guard(writeIn(worktree, TEST_FILE, `${SEED_TEST}\n`))));
 });

@@ -20,7 +20,11 @@ const LIVING_DOC = /(^|\/)\.liftoff\/wo\/[^/]+\/(intent|spec|plan)\.md$/;
 const SCRIPT_OWNED = /(^|\/)\.liftoff\/wo\/[^/]+\/(state\.json|gates\.log|\.changelog\.json)$/;
 
 function isAllowed(rel, allowed) {
-  return allowed.map(normalize).some((path) => path.endsWith('/') ? rel.startsWith(path) : rel === path);
+  return allowed.some((path) => {
+    if (path instanceof RegExp) return path.test(rel);
+    const norm = normalize(path);
+    return norm.endsWith('/') ? rel.startsWith(norm) : rel === norm;
+  });
 }
 
 // Returns the hook's JSON reply, or null to let the call through.

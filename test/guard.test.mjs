@@ -86,3 +86,10 @@ test('main session may write living docs; twins other .liftoff files', () => {
 test('explorer may not write anything, not even the profile', () => {
   assert.ok(isDenied(decide(input('spaceport:explorer', '.liftoff/profile.md'))));
 });
+
+test('validator may write only its own findings file', () => {
+  assert.equal(decide(input('spaceport:spec-validator', '.liftoff/wo/001-x/shreds/1/findings/r2-spec-validator.md')), null);
+  assert.ok(isDenied(decide(input('spaceport:spec-validator', '.liftoff/wo/001-x/shreds/1/findings/r2-security-validator.md'))));
+  assert.ok(isDenied(decide(input('spaceport:spec-validator', '.liftoff/wo/001-x/shreds/1/handoff.md'))));
+  assert.ok(isDenied(decide(input('spaceport:ux-validator', 'src/App.tsx'))));
+});

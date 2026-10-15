@@ -18,6 +18,10 @@ Before each, set `phase:` in `handoff.md` to it.
 | REFACTOR | Improve that requirement's design; tests stay green | Touch a test file |
 | BUILD | Red → green for the next requirement; tag its tests with `req-tag` | Production code before its failing test |
 
+A **fix turn** (`CHALLENGE findings r<k>`): the validators' findings are open `F` doubts in
+`handoff.md`. Fix each test-first, or reject it with a reason, or escalate a spec gap.
+A `(removal licensed)` finding: delete exactly the test lines quoted in its findings file, nothing more.
+
 Invoke `spaceport:write-handoff` to update `handoff.md` and check the turn before you stop.
 
 ## Boundaries

@@ -14,7 +14,7 @@ export const STEPS = ['intent', 'specs', 'plan', 'shred', 'work', 'validate', 'f
 
 // Human gate → the doc its approval covers (null: written after approval). A step needs every gate of an
 // earlier step approved, with its doc unchanged since.
-export const GATES = Object.freeze({ intent: null, specs: 'spec.md', shred: 'plan.md' });
+export const GATES = Object.freeze({ intent: null, specs: 'spec.md', shred: 'plan.md', final: null });
 
 export function woRoot(repo) {
   return join(repo, '.liftoff', 'wo');

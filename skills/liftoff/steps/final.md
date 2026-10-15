@@ -1,5 +1,11 @@
 # Final
 
-**Not built yet** (milestone 5).
+Every shred landed on `spaceport/<id>`. The user approves the result; nothing is pushed.
 
-Will: present the PR and summary for user approval.
+1. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/state.mjs" step <id> final`.
+2. **Summary**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/validate.mjs" summary <id>`.
+3. **Gate** `[gate <id> final]`: ask with `AskUserQuestion` to approve the work order. Preview: one
+   line per shred (`<n> <title>: <rounds> rounds`), then every Minor finding
+   (`[r<k> <role>] where: finding`), then the branch. Options: Approve, Change.
+   - Change → ask what; a spec change goes through `spaceport:amend-doc` (back to its gate).
+4. **Approved**: reply ✅ naming the branch `spaceport/<id>`: the user pushes and opens the PR.

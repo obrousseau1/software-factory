@@ -1,0 +1,29 @@
+schema_version: "1.0"
+name: validator-spec
+description: Spec validator flags the unimplemented R-02 clause (unknown codes must throw) as blocking.
+tags: [validator]
+context:
+  add_dirs: [fixture]
+execution:
+  prompt: |
+    Spawn the spaceport spec-validator agent with the Agent tool, with this exact prompt:
+    "Work order: 001-discount. Shred 1, round 1.
+    Repo: evals/validator-spec/fixture under the spaceport plugin root (two levels above your log-finding
+    skill's base directory). Worktree: <repo>/worktree. Diff: <repo>/.liftoff/wo/001-discount/shreds/1/diff-r1.patch.
+    Handoff: <repo>/.liftoff/wo/001-discount/shreds/1/handoff.md.
+    Findings file: .liftoff/wo/001-discount/shreds/1/findings/r1-spec-validator.md in the current working
+    directory. The repo is read-only; read nothing else in the plugin."
+    Then reply with the validator's report, verbatim.
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Write, Skill, Agent]
+runs: 3
+graders:
+  - type: regex
+    name: status-done
+    pattern: 'Status: done'
+  - type: regex
+    name: seeded-defect-blocks
+    target: { source: file, path: .liftoff/wo/001-discount/shreds/1/findings/r1-spec-validator.md }
+    pattern: '^\|\s*\d+\s*\|\s*(Critical|Major)\s*\|[^\n]*(R-02|unknown)'
+    flags: im

@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { frontmatter } from './frontmatter.mjs';
 import { isTest, profilePath, readProfile } from './profile.mjs';
 import { Role, bare } from './roles.mjs';
-import { Phase, activeShred, changes, handoffPath, mainRepo, removedLines, showAt } from './shred.mjs';
+import { Phase, activeShred, changes, handoffPath, mainRepo, showAt, testRemovals } from './shred.mjs';
 
 const deny = (reason) => ({
   hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason },
@@ -47,7 +47,7 @@ export function decide(input) {
   const profile = readProfile(profilePath(repo));
   if (isTest(profile, path)) {
     if (phase === Phase.Refactor) return deny('twin: REFACTOR may not touch test files.');
-    const removed = removedLines(showAt(shred.worktree, 'HEAD', path), contentAfter(input.tool_input, file));
+    const removed = testRemovals(shred, path, showAt(shred.worktree, 'HEAD', path), contentAfter(input.tool_input, file));
     if (removed.length) return deny(`twin: never delete or weaken an earlier turn's test; this removes "${removed[0]}".`);
     return null;
   }

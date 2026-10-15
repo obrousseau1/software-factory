@@ -1,0 +1,34 @@
+schema_version: "1.0"
+name: validator-standards
+description: Standards validator flags the tautological assert.ok(true) test as a Major test-relevance finding.
+tags: [validator]
+context:
+  add_dirs: [fixture]
+execution:
+  prompt: |
+    Spawn the spaceport standards-validator agent with the Agent tool, with this exact prompt:
+    "Work order: 001-discount. Shred 1, round 1.
+    Repo: evals/validator-standards/fixture under the spaceport plugin root (two levels above your log-finding
+    skill's base directory). Worktree: <repo>/worktree. Diff: <repo>/.liftoff/wo/001-discount/shreds/1/diff-r1.patch.
+    Handoff: <repo>/.liftoff/wo/001-discount/shreds/1/handoff.md.
+    Findings file: .liftoff/wo/001-discount/shreds/1/findings/r1-standards-validator.md in the current working
+    directory. The repo is read-only; read nothing else in the plugin."
+    Then reply with the validator's report, verbatim.
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Write, Skill, Agent]
+runs: 3
+graders:
+  - type: regex
+    name: status-done
+    pattern: 'Status: done'
+  - type: regex
+    name: seeded-defect-blocks
+    target: { source: file, path: .liftoff/wo/001-discount/shreds/1/findings/r1-standards-validator.md }
+    pattern: '^\|\s*\d+\s*\|\s*(Critical|Major)\s*\|[^\n]*(tautolog|assert\.ok\(true\)|irrelevant|loads)'
+    flags: im
+  - type: regex
+    name: removal-licensed
+    target: { source: file, path: .liftoff/wo/001-discount/shreds/1/findings/r1-standards-validator.md }
+    pattern: '^## Remove\s[\s\S]*^### \d+ tests/discount\.test\.js\s*\n```[^\n]*\n[\s\S]*assert\.ok\(true\);'
+    flags: m

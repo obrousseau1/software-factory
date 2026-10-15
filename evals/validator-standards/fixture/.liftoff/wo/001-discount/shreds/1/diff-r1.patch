@@ -1,0 +1,33 @@
+diff --git a/src/discount.js b/src/discount.js
+new file mode 100644
+index 0000000..84cb4d8
+--- /dev/null
++++ b/src/discount.js
+@@ -0,0 +1,6 @@
++const CODES = { SAVE10: 0.1 };
++
++export function applyDiscount(total, code) {
++  if (!(code in CODES)) throw new Error(`Unknown code: ${code}`);
++  return Math.round(total * (1 - CODES[code]) * 100) / 100;
++}
+diff --git a/tests/discount.test.js b/tests/discount.test.js
+new file mode 100644
+index 0000000..4272ed6
+--- /dev/null
++++ b/tests/discount.test.js
+@@ -0,0 +1,15 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { applyDiscount } from '../src/discount.js';
++
++test('R-01 SAVE10 takes 10% off, rounded to cents', () => {
++  assert.equal(applyDiscount(19.99, 'SAVE10'), 17.99);
++});
++
++test('R-02 unknown code throws', () => {
++  assert.throws(() => applyDiscount(10, 'NOPE'), /Unknown code: NOPE/);
++});
++
++test('R-01 discount module loads', () => {
++  assert.ok(true);
++});

@@ -18,6 +18,15 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-twin.mjs\""
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-spawn.mjs\""
+          }
+        ]
       }
     ],
     "PostToolUse": [

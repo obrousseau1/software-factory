@@ -103,10 +103,16 @@ it, then builds the next requirement.
 ## 5. Validators
 
 - Run **in parallel**, **read-only**, against the shred's worktree diff.
-- Output one findings file per round, each finding graded **Critical / Major / Minor**.
-- Liftoff decides who fixes each finding (twins; or, if the root cause is the spec/plan, liftoff amends
-  the doc and logs it).
-- Critical and Major block the round; Minor is logged and shown at final approval.
+- Each writes its own findings file per round (`findings/r<k>-<role>.md`, `log-finding` skill), each
+  finding graded **Critical / Major / Minor**. `validate.mjs verdict` reads them; liftoff never transcribes.
+- Critical and Major block the round: they become open `F<k>-<i>` doubts in `handoff.md` and the other twin
+  runs one fix turn (CHALLENGE only) that must resolve each. A spec gap is escalated by the twin.
+- A twin never deletes a test line on its own. A blocking finding may license it: the validator quotes the
+  exact lines under `## Remove`; in the fix turn only those lines may go (hooks subtract them).
+- Minor is logged and shown at final approval.
+- Clean round → the shred fast-forwards into the work-order branch `spaceport/<id>`; its worktree is removed.
+- Round 3 still failing → shred `escalated`; the user picks Stop (worktree kept) or Amend spec
+  (`shred.mjs drop`, back to the specs gate). Final approval pushes nothing: the user opens the PR.
 
 **Test relevance** (standards-validator). Every test in the diff must earn its place:
 - Covers a requirement `R-xx` or a named edge case of one.
@@ -137,7 +143,8 @@ it, then builds the next requirement.
     plan.md                   ┘
     shreds/<n>/handoff.md     twin continuity (frontmatter: turn, twin, phase, challenge, build)
     shreds/<n>/turns/<k>.md   handoff as turn k left it (archived by shred.mjs turn)
-    shreds/<n>/findings-r<k>.md
+    shreds/<n>/diff-r<k>.patch    shred diff validators read (validate.mjs round)
+    shreds/<n>/findings/r<k>-<role>.md
     ledger.md                 time + tokens per subagent run (hook-written)
     postmortem.md
     .changelog.json           body hash + row count per living doc (changelog hook)
@@ -177,11 +184,12 @@ one file plus the references the checks list.
 | Twin phase | PreToolUse `Edit\|Write` | twin | No phase removes a test line committed by an earlier turn (multiset vs `HEAD`). REFACTOR: no test file edits. BUILD: production edit only once a changed test references the requirement. Test files = profile `test-globs` |
 | Stay in the worktree | PreToolUse `Edit\|Write` | twin | Path outside the active shred's worktree (except its `handoff.md`) → deny. Bash is not parsed: the turn check flags main-repo changes made during the turn |
 | Turn complete | SubagentStop | twin | `shred.mjs` check: handoff at this turn and its last phase; every incoming open doubt resolved; no earlier test line removed; no main-repo change; gates green. Blocks ≤3 times per turn; `shred.mjs turn` refuses to advance until it passes |
-| UX deep evidence | SubagentStop | ux-validator at `deep` | One screenshot per UI acceptance criterion exists |
+| UX deep evidence | SubagentStop | ux-validator at `deep` | One screenshot per UI acceptance criterion exists *(deferred: deep runs as simple)* |
 | Shred complete | SubagentStop | twin, final turn | Gates green, no `TODO`/`NotImplemented` in diff, every shred `R-xx` referenced by a test |
 | Human gates | PostToolUse `AskUserQuestion` | liftoff | Question tagged `[gate <id> <gate>]` answered `Approve…` → approval + doc hash in `state.json`; every answer logged to `gates.log`. `state.mjs step` refuses a step whose earlier gates are unapproved or whose doc changed since |
 | Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json` → deny |
-| Round cap | PreToolUse `Agent` | liftoff | Spawning a twin for round 4 → deny |
+| Round cap | PreToolUse `Agent` | everyone | `guard-spawn`: twin only while a shred is in work, validator only while one is validating; escalated shred → deny. No work order in the repo → pass |
+| Validator writes | PreToolUse `Edit|Write` | validators | Only its own `findings/r<k>-<role>.md` |
 | Ledger | SubagentStop | all | Sum token usage + elapsed time from `agent_transcript_path` → append to `ledger.md` |
 
 ---
@@ -199,7 +207,6 @@ Small, single-purpose, loaded on demand by agents through the Skill tool.
 | `write-handoff` | twin | Fill `handoff.md` in the fixed format; run the turn check (`shred.mjs check`) |
 | `run-gates` | liftoff | Run profile's lint, typecheck, test; summarize |
 | `log-finding` | validators | Append a graded finding in the fixed format |
-| `close-worktree` | liftoff | Merge / remove a shred's worktree (M5); opening is `shred.mjs open` |
 | `report-back` | every subagent | Fixed, short return format to liftoff |
 | `postmortem` | liftoff | Write `postmortem.md`, feed `lessons.md` |
 
@@ -349,3 +356,5 @@ None. Agent names are provisional (§7).
 | 2026-10-14 | Human gates enforced: approvals written only from the user's `AskUserQuestion` answer (hook), checked by `state.mjs step` with a doc hash; Decisions table gains a Rejected column | Gates were prompt-only (principle 2) |
 | 2026-10-14 | `state.mjs step` moves one step forward (or back to any earlier); amending an approved doc sends liftoff back to its gate (spec change also redoes plan + shred) | Manual test: liftoff jumped to `final`; post-approval spec edit had no recovery path |
 | 2026-10-14 | Milestone 4: `shred.mjs` plans turns, opens a sibling worktree (`<repo>.spaceport/`, refused on a red base), commits each turn; `guard-twin` (phases, worktree, test lines) + `guard-turn` (SubagentStop); profile key `test-globs`; `trace-reqs` folded into the turn check | M4 planning; user picked profile globs, red-base refusal, sibling worktrees |
+| 2026-10-15 | Milestone 5: validators write own findings files; `validate.mjs` round/verdict/summary; blocking findings → `F` doubts + one fix turn; shreds land on `spaceport/<id>`; `guard-spawn` enforces the round cap; final = summary only; escalation = Stop / Amend spec; UX deep deferred; `close-worktree` dropped (script) | M5 planning; user picked wo branch, summary-only final, escalation options, deferring deep |
+| 2026-10-15 | Validator-licensed test removal: `## Remove` in a findings file lets the fix turn delete exactly the quoted test lines | Standards findings asked to remove duplicate tests the twin guard forbids deleting |
