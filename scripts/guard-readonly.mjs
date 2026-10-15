@@ -19,7 +19,7 @@ const normalize = (path) => {
 // Matched on the absolute path: a twin in a worktree still targets the main repo's `.liftoff/`.
 const LIVING_DOC = /(^|\/)\.liftoff\/wo\/[^/]+\/(intent|spec|plan)\.md$/;
 // Script-owned: approvals and snapshots must not be hand-edited, by liftoff either.
-const SCRIPT_OWNED = /(^|\/)\.liftoff\/wo\/[^/]+\/(state\.json|gates\.log|\.changelog\.json)$/;
+const SCRIPT_OWNED = /(^|\/)\.liftoff\/wo\/[^/]+\/(state\.json|gates\.log|\.changelog\.json|ledger\.md)$/;
 
 function isAllowed(rel, allowed) {
   return allowed.some((path) => {

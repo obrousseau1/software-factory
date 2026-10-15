@@ -57,6 +57,10 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-turn.mjs\"",
             "timeout": 1800
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/ledger.mjs\""
           }
         ]
       }

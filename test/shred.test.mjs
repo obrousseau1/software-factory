@@ -55,6 +55,15 @@ test('open creates a sibling worktree; one shred at a time', () => {
   assert.throws(() => openShred(repo, ID, 1), /already open/);
 });
 
+test('twin prompt carries only twin lessons', () => {
+  const repo = makeRepo();
+  write(repo, '.liftoff/lessons.md', '# Lessons\n- [twin] Put tests next to the code.\n- [spec-validator] Check R-xx clauses.\n');
+  openShred(repo, ID, 1);
+  const { prompt } = nextTurn(repo, ID, 1);
+  assert.match(prompt, /Lessons from earlier work orders: Put tests next to the code\.$/);
+  assert.doesNotMatch(prompt, /R-xx clauses/);
+});
+
 test('turn 0 writes the handoff and prints the twin prompt', () => {
   const repo = makeRepo();
   openShred(repo, ID, 1);

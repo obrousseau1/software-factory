@@ -1,0 +1,37 @@
+schema_version: "1.0"
+name: postmortem
+description: Postmortem blames the twin for the R-02 miss caught in round 1, copies the ledger totals, and writes a [twin] lesson.
+tags: [postmortem]
+context:
+  add_dirs: [fixture]
+execution:
+  prompt: |
+    Run the spaceport postmortem skill on work order 001-discount.
+    Work-order folder (read-only): evals/postmortem/fixture/.liftoff/wo/001-discount under the spaceport plugin
+    root (two levels above the postmortem skill's base directory). Its repo's .liftoff/ is
+    evals/postmortem/fixture/.liftoff there too. Read nothing else in the plugin.
+    Write postmortem.md to .liftoff/wo/001-discount/postmortem.md and lessons to .liftoff/lessons.md, both in
+    the current working directory.
+    Then reply with the skill's return line, verbatim.
+  max_turns: 30
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Write, Skill]
+runs: 3
+graders:
+  - type: regex
+    name: return-line
+    pattern: 'Postmortem: 1 failures?, [1-9]\d* lessons?'
+  - type: regex
+    name: failure-row
+    target: { source: file, path: .liftoff/wo/001-discount/postmortem.md }
+    pattern: '^\|\s*1\s*\|\s*1\s*\|\s*spec-validator\s*\|\s*twin\s*\|\s*Major\s*\|'
+    flags: im
+  - type: regex
+    name: ledger-totals-copied
+    target: { source: file, path: .liftoff/wo/001-discount/postmortem.md }
+    pattern: '140720[\s\S]*388078'
+  - type: regex
+    name: twin-lesson
+    target: { source: file, path: .liftoff/lessons.md }
+    pattern: '^- \[twin\] .+\(001-discount\)\s*$'
+    flags: m

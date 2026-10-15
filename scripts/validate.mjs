@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { section, shreds } from './docs.mjs';
+import { lessonsNote } from './lessons.mjs';
 import { PLUGIN, Role, VALIDATORS } from './roles.mjs';
 import { git, handoffPath, mainRepo, saveShred, shredDir, woBranch } from './shred.mjs';
 import { getWorkOrder, woRoot } from './state.mjs';
@@ -51,7 +52,7 @@ export function startRound(repo, id, n) {
     agent: `${PLUGIN}:${role}`,
     prompt: `Work order: ${id}. Shred ${n}, round ${round}. Repo: ${repo}. Worktree: ${shred.worktree}. Diff: ${diff}. `
       + `Handoff: ${handoffPath(repo, id, n)}. Findings file: ${findingsPath(repo, id, n, round, role)}.`
-      + (role === Role.UxValidator ? ` UX level: ${level}.` : '') + earlier,
+      + (role === Role.UxValidator ? ` UX level: ${level}.` : '') + earlier + lessonsNote(repo, role),
   }));
   return { round, validators, warnings: ux === 'deep' ? ['UX deep runs as simple (Playwright not built yet).'] : [] };
 }

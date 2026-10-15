@@ -9,7 +9,9 @@ import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { section, shreds } from './docs.mjs';
 import { frontmatter } from './frontmatter.mjs';
+import { lessonsNote } from './lessons.mjs';
 import { NONE, gateCommands, isTest, profilePath, readProfile } from './profile.mjs';
+import { Role } from './roles.mjs';
 import { getWorkOrder, saveState, woRoot } from './state.mjs';
 
 export const Phase = Object.freeze({ Challenge: 'CHALLENGE', Refactor: 'REFACTOR', Build: 'BUILD' });
@@ -284,7 +286,8 @@ export function nextTurn(repo, id, n) {
 
   const steps = plan.phases.map((phase) => `${phase} ${phase === Phase.Build ? plan.build : plan.challenge}`).join(' → ');
   const prompt = `Work order: ${id}. Shred ${n}, turn ${k}, twin ${plan.twin}. Phases: ${steps}. `
-    + `Worktree: ${shred.worktree}. Handoff: ${handoff}.${plan.final ? ' Final turn: the shred is complete when you stop.' : ''}`;
+    + `Worktree: ${shred.worktree}. Handoff: ${handoff}.${plan.final ? ' Final turn: the shred is complete when you stop.' : ''}`
+    + lessonsNote(repo, Role.Twin);
   return { turn: k, ...plan, prompt, done: false };
 }
 

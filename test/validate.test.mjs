@@ -56,6 +56,14 @@ test('round writes the diff and prompts each validator; ux skipped at none', () 
   assert.equal(shred(repo).status, 'validating');
 });
 
+test('each validator prompt carries only its own lessons', () => {
+  const { repo } = built();
+  write(repo, '.liftoff/lessons.md', '# Lessons\n- [twin] Put tests next to the code.\n- [spec-validator] Check R-xx clauses.\n');
+  const [spec, security] = startRound(repo, ID, 1).validators;
+  assert.match(spec.prompt, /Lessons from earlier work orders: Check R-xx clauses\.$/);
+  assert.doesNotMatch(security.prompt, /Lessons/);
+});
+
 test('round refuses a shred that is not built', () => {
   const repo = makeRepo();
   openShred(repo, ID, 1);

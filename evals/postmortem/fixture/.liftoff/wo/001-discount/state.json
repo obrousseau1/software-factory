@@ -1,0 +1,9 @@
+{
+  "id": "001-discount",
+  "idea": "discount codes",
+  "step": "final",
+  "shreds": [
+    { "n": 1, "status": "landed", "round": 2, "turn": 3, "minor": [] }
+  ],
+  "approvals": { "intent": {}, "specs": {}, "shred": {}, "final": {} }
+}

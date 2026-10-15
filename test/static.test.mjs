@@ -75,6 +75,13 @@ test('every hook command script exists', () => {
   for (const script of scripts) assert.ok(existsSync(join(root, script)), script);
 });
 
+test('every spaceport:<name> in skills and agents is a skill or an agent', () => {
+  const names = new Set([...skillDirs, ...Object.values(Role)]);
+  for (const md of [...markdownIn(join(root, 'skills')), ...markdownIn(join(root, 'agents'))]) {
+    for (const [, name] of readFileSync(md, 'utf8').matchAll(/spaceport:([a-z-]+)/g)) assert.ok(names.has(name), `${md} → ${name}`);
+  }
+});
+
 test('every known stack has a fixture and an eval', () => {
   for (const cue of readdirSync(join(root, 'skills', 'explore-repo', 'stacks'))) {
     const stack = cue.replace(/\.md$/, '');

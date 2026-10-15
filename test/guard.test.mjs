@@ -74,7 +74,7 @@ test('no subagent may write a living doc, even from a worktree', () => {
 });
 
 test('nobody hand-edits script-owned state, not even the main session', () => {
-  for (const file of ['state.json', 'gates.log', '.changelog.json']) {
+  for (const file of ['state.json', 'gates.log', '.changelog.json', 'ledger.md']) {
     assert.ok(isDenied(decide(input(undefined, `.liftoff/wo/001-x/${file}`))), file);
     assert.ok(isDenied(decide(input('twin', `.liftoff/wo/001-x/${file}`))), file);
   }

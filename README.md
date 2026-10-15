@@ -3,7 +3,7 @@
 `spaceport`: a Claude Code plugin that runs an agent software factory. Its orchestrator, **liftoff**,
 turns a one-line idea into reviewed, tested code. Design: [docs/liftoff-design.md](docs/liftoff-design.md).
 
-Status: milestone 5 — validators check each built shred (max 3 rounds, then escalation); validated shreds land on `spaceport/<id>`; final approval shows the summary. Ledger and postmortem are next.
+Status: milestone 6 — a ledger logs real tokens and time per subagent run; after final approval a postmortem feeds role-tagged lessons back into later prompts. Stack templates are next.
 
 ## Install into a repo
 

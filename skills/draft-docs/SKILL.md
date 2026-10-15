@@ -11,7 +11,8 @@ Inputs from the prompt: **mode** (`spec` or `plan`), **work-order folder**, and 
 ## 1. Read
 
 From the work-order folder: `intent.md`; for `plan` also `spec.md`. From the repo:
-`.liftoff/profile.md` (stack, architecture, conventions), then the code the idea touches.
+`.liftoff/profile.md` (stack, architecture, conventions), the `- [architect]` lines of
+`.liftoff/lessons.md` if present (apply them), then the code the idea touches.
 For broad questions spawn `spaceport:explorer`; cite what you rely on.
 
 ## 2. Brainstorm (no answers, no feedback)

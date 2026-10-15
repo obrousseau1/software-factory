@@ -8,4 +8,6 @@ Every shred landed on `spaceport/<id>`. The user approves the result; nothing is
    line per shred (`<n> <title>: <rounds> rounds`), then every Minor finding
    (`[r<k> <role>] where: finding`), then the branch. Options: Approve, Change.
    - Change → ask what; a spec change goes through `spaceport:amend-doc` (back to its gate).
-4. **Approved**: reply ✅ naming the branch `spaceport/<id>`: the user pushes and opens the PR.
+4. **Approved**: run the `spaceport:postmortem` skill on the work order.
+5. Reply ✅ naming the branch `spaceport/<id>` (the user pushes and opens the PR) and the lesson
+   count. Suggested factory changes → `Decision:` line: the user applies them to the plugin.

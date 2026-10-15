@@ -187,11 +187,11 @@ one file plus the references the checks list.
 | UX deep evidence | SubagentStop | ux-validator at `deep` | One screenshot per UI acceptance criterion exists *(deferred: deep runs as simple)* |
 | Shred complete | SubagentStop | twin, final turn | Gates green, no `TODO`/`NotImplemented` in diff, every shred `R-xx` referenced by a test |
 | Human gates | PostToolUse `AskUserQuestion` | liftoff | Question tagged `[gate <id> <gate>]` answered `Approve…` → approval + doc hash in `state.json`; every answer logged to `gates.log`. `state.mjs step` refuses a step whose earlier gates are unapproved or whose doc changed since |
-| Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json` → deny |
+| Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json`, `ledger.md` → deny |
 | Round cap | PreToolUse `Agent` | everyone | `guard-spawn`: twin only while a shred is in work, validator only while one is validating; escalated shred → deny. No work order in the repo → pass |
 | Validator writes | PreToolUse `Edit|Write` | validators | Only its own `findings/r<k>-<role>.md` |
 | Liftoff writes no code | PreToolUse `Edit|Write` | liftoff | Target inside a shred worktree not yet landed → deny |
-| Ledger | SubagentStop | all | Sum token usage + elapsed time from `agent_transcript_path` → append to `ledger.md` |
+| Ledger | SubagentStop | all | `ledger.mjs`: sum token usage (last entry per message id) + elapsed time (first → last entry) from `agent_transcript_path`; one row per agent id in the latest work order not yet final-approved, per-role totals. Fails open |
 
 ---
 
@@ -227,9 +227,11 @@ Small, single-purpose, loaded on demand by agents through the Skill tool.
 
 ## 10. Memory
 
-After each work order, liftoff runs `postmortem`:
+After final approval, liftoff runs `postmortem` (prompt-only, no hook):
 - What failed, which round caught it, which agent caused it, time/tokens from the ledger.
-- Durable lessons appended to `.liftoff/lessons.md` (repo-specific).
+- Durable lessons appended to `.liftoff/lessons.md` (repo-specific), one line each, tagged with the role
+  that should act differently: `- [twin] …`. Scripts inline each role's lines into the twin and validator
+  prompts they build; the architect reads its lines in `draft-docs`.
 - Lessons that are factory-wide are listed as suggested changes to the plugin (agents, skills, hooks)
   for you to accept.
 
@@ -360,3 +362,4 @@ None. Agent names are provisional (§7).
 | 2026-10-15 | Milestone 5: validators write own findings files; `validate.mjs` round/verdict/summary; blocking findings → `F` doubts + one fix turn; shreds land on `spaceport/<id>`; `guard-spawn` enforces the round cap; final = summary only; escalation = Stop / Amend spec; UX deep deferred; `close-worktree` dropped (script) | M5 planning; user picked wo branch, summary-only final, escalation options, deferring deep |
 | 2026-10-15 | Validator-licensed test removal: `## Remove` in a findings file lets the fix turn delete exactly the quoted test lines | Standards findings asked to remove duplicate tests the twin guard forbids deleting |
 | 2026-10-15 | Liftoff denied writes in open shred worktrees | Sandbox: liftoff deleted tests a twin escalated, bypassing the twin guard |
+| 2026-10-15 | Milestone 6: ledger hook (one row per agent id, totals); postmortem after final approval; lessons tagged per role, inlined into twin/validator prompts | M6 planning; user picked role-tagged lessons, prompt-only postmortem |
