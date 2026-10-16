@@ -1,6 +1,6 @@
 // PreToolUse hook: restricted roles may write only their allowed paths (roles.mjs WRITE_LIMITS); no subagent
 // may write a living doc (intent/spec/plan.md); nobody may hand-edit script-owned state; liftoff never writes in an
-// open shred's worktree (twins own it). Fails closed.
+// open shred's worktree (the builder owns it). Fails closed.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -16,7 +16,7 @@ const normalize = (path) => {
   return process.platform === 'win32' ? posix.toLowerCase() : posix;
 };
 
-// Matched on the absolute path: a twin in a worktree still targets the main repo's `.liftoff/`.
+// Matched on the absolute path: the builder in a worktree still targets the main repo's `.liftoff/`.
 const LIVING_DOC = /(^|\/)\.liftoff\/wo\/[^/]+\/(intent|spec|plan)\.md$/;
 // Script-owned: approvals and snapshots must not be hand-edited, by liftoff either.
 const SCRIPT_OWNED = /(^|\/)\.liftoff\/wo\/[^/]+\/(state\.json|gates\.log|\.changelog\.json|ledger\.md)$/;
@@ -51,7 +51,7 @@ export function decide(input) {
   if (absolute && SCRIPT_OWNED.test(normalize(absolute))) return deny('Written by spaceport scripts only (state.mjs, hooks).');
   if (!role) {
     const liftoffInWorktree = absolute && inShredWorktree(input.cwd, absolute);
-    return liftoffInWorktree ? deny('liftoff never writes code: twins own the shred worktree. Route the change through a twin turn or ask the user.') : null;
+    return liftoffInWorktree ? deny('liftoff never writes code: the builder owns the shred worktree. Route the change through the builder or ask the user.') : null;
   }
   const allowed = WRITE_LIMITS[role];
 

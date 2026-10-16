@@ -7,7 +7,7 @@ context:
 execution:
   prompt: |
     Spawn the spaceport architect agent with the Agent tool, with this exact prompt:
-    "Mode: spec. Work order: .liftoff/wo/001-share-orders under the repo root.
+    "Work order: .liftoff/wo/001-share-orders under the repo root.
     Repo root: evals/architect-brainstorm/fixture under the spaceport plugin root (two levels above your draft-docs
     skill's base directory). Read-only; read nothing else in the plugin."
     Then reply with the architect's report, verbatim.

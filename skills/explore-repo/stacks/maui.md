@@ -21,11 +21,6 @@
 | gate-test | `dotnet test <tests>` |
 | run | `dotnet build <app> -t:Run -f <tfm>` |
 
-## req-tag
-
-xUnit: `[Trait("Req", "R-01")]`. NUnit: `[Property("Req", "R-01")]`. MSTest:
-`[TestProperty("Req", "R-01")]`.
-
 ## test-globs
 
 The test projects' folders, e.g. `<Name>.Tests/**`.
@@ -33,6 +28,11 @@ The test projects' folders, e.g. `<Name>.Tests/**`.
 ## ui-globs
 
 `**/*.xaml`, `**/*.xaml.cs`.
+
+## sensitive-globs
+
+Where the security reviewer looks: auth, secure storage, HTTP clients, dependencies.
+`**/MauiProgram.cs`, `**/*Auth*`, `**/*Auth*/**`, `**/*Http*.cs`, `**/*Storage*.cs`, `**/*.csproj`; add the repo's own auth or storage folders.
 
 ## Watch
 

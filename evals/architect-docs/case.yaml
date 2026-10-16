@@ -1,0 +1,47 @@
+schema_version: "1.0"
+name: architect-docs
+description: From a settled intent, the architect drafts spec.md (testable requirements, each with a Test line) and plan.md (shreds table covering every requirement, naming real repo files) in one pass.
+tags: [architect]
+context:
+  add_dirs: [fixture]
+execution:
+  prompt: |
+    Spawn the spaceport architect agent with the Agent tool, with this exact prompt:
+    "Work order: .liftoff/wo/001-discount under the repo root.
+    No more questions: decide and record in Decisions.
+    Repo root: evals/architect-docs/fixture under the spaceport plugin root (two levels above your draft-docs
+    skill's base directory). Read-only; read nothing else in the plugin."
+    Then reply with the architect's report, verbatim.
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent]
+runs: 3
+graders:
+  - type: regex
+    name: status-draft
+    pattern: 'Status: draft'
+  - type: regex
+    name: requirement-ids
+    pattern: '^### R-01: [\s\S]*^### R-02: '
+    flags: m
+  - type: regex
+    name: given-when-then
+    pattern: '[Gg]iven [^\n]*when [^\n]*then'
+  - type: regex
+    name: test-lines
+    pattern: '^- Test: (automated|manual)\b[\s\S]*^- Test: (automated|manual)\b'
+    flags: m
+  - type: regex
+    name: spec-then-plan
+    pattern: '^# Spec:[\s\S]*^# Plan:'
+    flags: m
+  - type: regex
+    name: shreds-table
+    pattern: '^## Shreds\s*\n\|\s*#\s*\|\s*Title\s*\|\s*Requirements\s*\|\s*Region\s*\|\s*Depends on\s*\|\s*UX\s*\|'
+    flags: m
+  - type: regex
+    name: names-real-files
+    pattern: 'Order\.cs|Program\.cs'
+  - type: regex
+    name: decisions-rejected
+    pattern: '\|\s*Decision\s*\|\s*Rejected\s*\|\s*Why\s*\|\s*By\s*\|'

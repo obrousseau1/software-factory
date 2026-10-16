@@ -7,7 +7,7 @@ Write into `.liftoff/proposals/<shape>/`:
 
 | File | Content |
 |------|---------|
-| `stack.md` | A cue file in the same layout as `stacks/*.md`: Match, Defaults, req-tag, test-globs, ui-globs, Watch |
+| `stack.md` | A cue file in the same layout as `stacks/*.md`: Match, Defaults, test-globs, ui-globs, Watch |
 | `fixture.md` | The smallest repo of this shape: a file tree, then each file's full content. A few files only |
 | `expected-profile.md` | The profile you would write for that fixture |
 | `prompt.md` | Eval prompt, same wording as the plugin's `evals/profiler-<stack>/case.yaml` prompt |

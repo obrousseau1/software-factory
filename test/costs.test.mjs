@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cost, reconcile, sessionOf } from '../scripts/costs.mjs';
-import { usage } from '../scripts/ledger.mjs';
+import { cost, reconcile, sessionOf, usage } from '../scripts/costs.mjs';
+import { costReport, render } from '../scripts/ledger.mjs';
 
 const SONNET = 'claude-sonnet-5-5';
 const OPUS = 'claude-opus-5-5';
@@ -31,7 +31,7 @@ function projects() {
   return root;
 }
 
-const run = (agent, output) => ({ agent, role: 'twin', ...usage(message(agent, SONNET, output)) });
+const run = (agent, output, role = 'builder') => ({ agent, role, ...usage(message(agent, SONNET, output)) });
 
 test('runs are scaled to their session cost-state, per model', () => {
   const [a1, a2] = reconcile([run('a1', 50), run('a2', 150)], projects());
@@ -48,4 +48,12 @@ test('a run of an open session, or of no known session, keeps its snapshot', () 
   assert.equal(lost.reconciled, false);
   assert.equal(sessionOf(root, 'zz'), null);
   assert.equal(sessionOf(join(root, 'missing'), 'a1'), null);
+});
+
+test('ledger cost: true $ per role and in total, with how many runs were reconciled', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'spaceport-cost-'));
+  mkdirSync(join(repo, '.liftoff', 'wo', '001-x'), { recursive: true });
+  writeFileSync(join(repo, '.liftoff', 'wo', '001-x', 'ledger.md'), render([run('a1', 50), run('a2', 150), run('a3', 20, 'reviewer')]));
+  assert.deepEqual(costReport(repo, '001-x', projects()), { total: 0.5, roles: { builder: 0.5, reviewer: 0 }, reconciled: '2/3' });
+  assert.throws(() => costReport(repo, '002-none', projects()), /No ledger for work order 002-none/);
 });

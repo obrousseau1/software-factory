@@ -7,9 +7,9 @@ gate-typecheck: none
 gate-build: dotnet build Notes.App/Notes.App.csproj -f net10.0-windows10.0.19041.0
 gate-test: dotnet test Notes.Core.Tests/Notes.Core.Tests.csproj
 run: dotnet build Notes.App/Notes.App.csproj -t:Run -f net10.0-windows10.0.19041.0
-req-tag: xUnit [Trait("Req", "R-01")]
 test-globs: Notes.Core.Tests/**
 ui-globs: **/*.xaml, **/*.xaml.cs
+sensitive-globs: **/MauiProgram.cs, **/*Auth*, **/*Auth*/**, **/*Http*.cs, **/*Storage*.cs, **/*.csproj
 ---
 
 # Repo profile

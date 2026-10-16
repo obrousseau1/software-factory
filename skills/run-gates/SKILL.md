@@ -1,6 +1,6 @@
 ---
 name: run-gates
-description: Run the repo's gate commands from .liftoff/profile.md (format, lint, typecheck, build, test) and return a fixed pass/fail table with the first error of each failure. Use when liftoff verifies a new profile, or a twin or liftoff needs to know whether the gates are green.
+description: Run the repo's gate commands from .liftoff/profile.md (format, lint, typecheck, build, test) and return a fixed pass/fail table with the first error of each failure. Use when liftoff verifies a new profile, or liftoff needs to know whether the gates are green.
 ---
 
 # Run gates

@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-twin.mjs\""
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-builder.mjs\""
           }
         ]
       },
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-turn.mjs\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-builder.mjs\"",
             "timeout": 1800
           },
           {

@@ -3,7 +3,7 @@
   "idea": "discount codes",
   "step": "final",
   "shreds": [
-    { "n": 1, "status": "landed", "round": 2, "turn": 3, "minor": [] }
+    { "n": 1, "status": "landed", "round": 2, "reviewers": ["reviewer", "security-reviewer"], "minor": [] }
   ],
-  "approvals": { "intent": {}, "specs": {}, "shred": {}, "final": {} }
+  "approvals": { "intent": {}, "docs": {}, "final": {} }
 }

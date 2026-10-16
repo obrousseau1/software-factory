@@ -6,9 +6,11 @@
 
 ### R-01: <title>
 - Given <state>, when <action>, then <observable result>.
+- Test: automated — <test file>: <what it asserts>
 
 ### R-02: <title>
 - Given …, when …, then ….
+- Test: manual — <how to check>, only when a test cannot see it
 
 ## Out of scope
 - <from intent, plus anything the requirements deliberately leave out>

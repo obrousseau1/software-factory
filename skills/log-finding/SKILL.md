@@ -1,32 +1,35 @@
 ---
 name: log-finding
-description: Write a spaceport validator's findings file for one round in the fixed format - one graded row per finding (Critical / Major / Minor) - and return the short validator report. Use when a spaceport validator reviews a shred's diff.
+description: Write a spaceport reviewer's findings file for one round in the fixed format - one row per finding, graded by a strict rubric (Critical / Major / Minor) - and return the short reviewer report. Use when a spaceport reviewer reviews a shred's diff.
 ---
 
 # Log finding
 
 ## Inputs
 
-The prompt gives the repo, the worktree, the diff (`diff-r<k>.patch`), `handoff.md`, the findings file to
-write and, from round 2, the earlier findings folder. The spec is
+The prompt gives the repo, the worktree, the diff (`diff-r<k>.patch`), the findings file to write
+and, from round 2, the earlier findings folder and the builder's replies. The spec is
 `<repo>/.liftoff/wo/<id>/spec.md`, the shred row is in `plan.md`, conventions in
 `<repo>/.liftoff/profile.md`. Read the diff first, then the files it touches in the worktree.
 
 ## Severity
 
-| Severity | Means | Effect |
-|----------|-------|--------|
-| Critical | Wrong behaviour, data loss, exploitable flaw, a requirement not done | Blocks the round |
-| Major | Requirement clause missed, real risk, convention broken in a way that will cost | Blocks the round |
-| Minor | Worth knowing, not worth another round | Logged, shown at final |
+Blocking findings cost a whole fix round. Only these block:
 
-Grade honestly: no Major for taste. Only the diff is in scope; existing code only where the diff
-makes it wrong.
+| Severity | Only for | Effect |
+|----------|----------|--------|
+| Critical | Data loss, or a flaw exploitable as written | Blocks the round |
+| Major | A requirement clause broken or not tested; new UI not accessible (label, keyboard, focus); a security risk under plausible use; a test that cannot fail | Blocks the round |
+| Minor | Everything else: naming, style, design taste, scope creep, missing edge case the spec does not ask for, a unit test where a behaviour test would do | Logged, shown at final |
+
+Not on that list → Minor, however strongly you feel. Only the diff is in scope; existing code only
+where the diff makes it wrong.
 
 ## Earlier rounds
 
-`handoff.md` Doubts holds earlier findings (`F<k>-<i>`) and how the twins resolved them. Re-raise one
-only if its fix is wrong or its `rejected:` reason is; say why in the row.
+Earlier findings (`F<k>-<i>`) are in the earlier findings folder; the builder's replies say which it
+fixed and which it rejected, and why. Re-raise one only if its fix is wrong or its rejection reason
+is; say why in the row.
 
 ## File
 
@@ -42,7 +45,7 @@ Write the findings file once, with exactly this table (no rows = nothing found):
 
 One row per finding; `Where` is `path:line` in the worktree; no `|` inside a cell.
 
-**Removing test lines.** Twins may never delete a test line on their own. When a Critical / Major
+**Removing test lines.** The builder may never delete a committed test line on its own. When a Critical / Major
 finding needs one gone (duplicate, irrelevant, or a weak assertion to replace), license it: after
 the table, quote the exact lines to delete, path relative to the worktree, `#` = the finding's row.
 

@@ -4,7 +4,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { currentWorkOrder, record, usage } from '../scripts/ledger.mjs';
+import { usage } from '../scripts/costs.mjs';
+import { currentWorkOrder, record } from '../scripts/ledger.mjs';
 import { ID, makeRepo, write } from './shred-repo.mjs';
 
 const script = fileURLToPath(new URL('../scripts/ledger.mjs', import.meta.url));
@@ -26,7 +27,7 @@ const TRANSCRIPT = [
   entry('m2', '30', 25),
 ].join('\n');
 
-function stop(repo, agentId, agentType = 'spaceport:twin', transcript = TRANSCRIPT) {
+function stop(repo, agentId, agentType = 'spaceport:builder', transcript = TRANSCRIPT) {
   const path = join(repo, '..', `${agentId}.jsonl`);
   write(repo, join('..', `${agentId}.jsonl`), transcript);
   return record({ cwd: repo, agent_id: agentId, agent_type: agentType, agent_transcript_path: path });
@@ -42,12 +43,12 @@ test('usage keeps the last entry per message and times first to last entry', () 
 test('one row per agent, rewritten on a later stop; totals per role', () => {
   const repo = makeRepo();
   stop(repo, 'a1');
-  stop(repo, 'a2', 'spaceport:spec-validator');
-  stop(repo, 'a1', 'spaceport:twin', [TRANSCRIPT, entry('m3', '40', 5)].join('\n'));
+  stop(repo, 'a2', 'spaceport:reviewer');
+  stop(repo, 'a1', 'spaceport:builder', [TRANSCRIPT, entry('m3', '40', 5)].join('\n'));
   const md = readFileSync(ledger(repo), 'utf8');
   assert.equal(md.match(/^\| a1 \|/gm).length, 1);
-  assert.match(md, /^\| a1 \| twin \| claude-sonnet-5-5 \| 2026-10-15T10:00:00\.000Z \| 40 \| 6 \| 300 \| 3000 \| 70 \|$/m);
-  assert.match(md, /^\| twin \| 1 \| 40 \| 6 \| 300 \| 3000 \| 70 \|$/m);
+  assert.match(md, /^\| a1 \| builder \| claude-sonnet-5-5 \| 2026-10-15T10:00:00\.000Z \| 40 \| 6 \| 300 \| 3000 \| 70 \|$/m);
+  assert.match(md, /^\| builder \| 1 \| 40 \| 6 \| 300 \| 3000 \| 70 \|$/m);
   assert.match(md, /^\| \*\*All\*\* \| 2 \| 70 \| 10 \| 500 \| 5000 \| 135 \|$/m);
 });
 
@@ -59,11 +60,11 @@ test('logs to the latest work order not approved at final', () => {
   assert.equal(stop(repo, 'a1'), null);
 });
 
-test('logs to the work order whose shred or benchmark is in progress, even when a later one is open', () => {
+test('logs to the work order whose shred is in progress, even when a later one is open', () => {
   const repo = makeRepo();
   write(repo, '.liftoff/wo/009-later/state.json', JSON.stringify({ id: '009-later', step: 'intent' }));
   assert.equal(currentWorkOrder(repo), '009-later');
-  for (const shred of [{ n: 1, status: 'work' }, { n: 1, status: 'landed', bench: { status: 'validating' } }]) {
+  for (const shred of [{ n: 1, status: 'work' }, { n: 1, status: 'reviewing' }]) {
     write(repo, `.liftoff/wo/${ID}/state.json`, JSON.stringify({ id: ID, shreds: [shred] }));
     assert.equal(currentWorkOrder(repo), ID);
   }
@@ -71,7 +72,7 @@ test('logs to the work order whose shred or benchmark is in progress, even when 
 
 test('hook fails open on a missing transcript', () => {
   const repo = makeRepo();
-  const input = JSON.stringify({ cwd: repo, agent_id: 'a1', agent_type: 'twin', agent_transcript_path: join(repo, 'nope.jsonl') });
+  const input = JSON.stringify({ cwd: repo, agent_id: 'a1', agent_type: 'builder', agent_transcript_path: join(repo, 'nope.jsonl') });
   const result = spawnSync(process.execPath, [script], { input, encoding: 'utf8' });
   assert.equal(result.status, 0);
   assert.equal(result.stdout, '');

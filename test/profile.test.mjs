@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { gateCommands, isTest, readProfile, validateProfile } from '../scripts/profile.mjs';
+import { gateCommands, isSensitive, isTest, readProfile, validateProfile } from '../scripts/profile.mjs';
 
 const script = fileURLToPath(new URL('../scripts/profile.mjs', import.meta.url));
 const expected = fileURLToPath(new URL('./expected-profiles', import.meta.url));
@@ -19,7 +19,6 @@ const valid = {
   'gate-build': 'dotnet build App.csproj',
   'gate-test': 'dotnet test',
   run: 'none',
-  'req-tag': '[Trait("Req", "R-01")]',
   'test-globs': 'tests/**, **/*Tests.cs',
   'ui-globs': '**/*.xaml',
 };
@@ -54,6 +53,16 @@ test('isTest matches any of the comma-separated globs', () => {
   assert.ok(!isTest(valid, 'src/App/App.cs'));
 });
 
+test('isSensitive: optional globs; missing → every path, none → no path', () => {
+  assert.ok(isSensitive(valid, 'src/App/App.cs'));
+  assert.ok(!isSensitive({ ...valid, 'sensitive-globs': 'none' }, 'src/Auth/Login.cs'));
+  const meta = { ...valid, 'sensitive-globs': 'src/Auth/**, **/*Parser.cs' };
+  assert.ok(isSensitive(meta, 'src/Auth/Login.cs'));
+  assert.ok(isSensitive(meta, 'src/Csv/CsvParser.cs'));
+  assert.ok(!isSensitive(meta, 'src/App/App.cs'));
+  assert.deepEqual(validateProfile(meta), []);
+});
+
 test('gates skip none, keep order', () => {
   assert.deepEqual(gateCommands(valid), {
     format: 'dotnet format --verify-no-changes',
@@ -63,7 +72,8 @@ test('gates skip none, keep order', () => {
 });
 
 test('readProfile parses frontmatter, keeps quotes inside values', () => {
-  assert.equal(readProfile(writeProfile(valid))['req-tag'], '[Trait("Req", "R-01")]');
+  const run = 'dotnet run --project "src/App/App.csproj" -c Release';
+  assert.equal(readProfile(writeProfile({ ...valid, run })).run, run);
 });
 
 test('readProfile throws on a missing file', () => {

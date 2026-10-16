@@ -1,6 +1,6 @@
 schema_version: "1.0"
 name: postmortem
-description: Postmortem blames the twin for the R-02 miss caught in round 1, copies the ledger totals, and writes a [twin] lesson.
+description: Postmortem blames the builder for the R-02 miss the reviewer caught in round 1, copies the ledger totals, and writes a [builder] lesson.
 tags: [postmortem]
 context:
   add_dirs: [fixture]
@@ -24,14 +24,14 @@ graders:
   - type: regex
     name: failure-row
     target: { source: file, path: .liftoff/wo/001-discount/postmortem.md }
-    pattern: '^\|\s*1\s*\|\s*1\s*\|\s*spec-validator\s*\|\s*twin\s*\|\s*Major\s*\|'
+    pattern: '^\|\s*1\s*\|\s*1\s*\|\s*reviewer\s*\|\s*builder\s*\|\s*Major\s*\|'
     flags: im
   - type: regex
     name: ledger-totals-copied
     target: { source: file, path: .liftoff/wo/001-discount/postmortem.md }
     pattern: '140720[\s\S]*388078'
   - type: regex
-    name: twin-lesson
+    name: builder-lesson
     target: { source: file, path: .liftoff/lessons.md }
-    pattern: '^- \[twin\] .+\(001-discount\)\s*$'
+    pattern: '^- \[builder\] .+\(001-discount\)\s*$'
     flags: m

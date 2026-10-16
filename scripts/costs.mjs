@@ -1,9 +1,39 @@
-// True output tokens and $ of ledger runs. Transcripts keep a stream-start snapshot of output_tokens; the `cost-state`
-// entry a session writes when it ends holds the true per-model totals. Each run is scaled to its session's totals.
+// Token usage of agent runs, and their true output tokens and $. Transcripts keep a stream-start snapshot of
+// output_tokens; the `cost-state` entry a session writes when it ends holds the true per-model totals. Each run is
+// scaled to its session's totals.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { usage } from './ledger.mjs';
+
+// Transcript JSONL → usage. An assistant message repeats once per content block with growing output_tokens:
+// keep the last entry per message id.
+export function usage(jsonl) {
+  const messages = new Map();
+  let first, last, model;
+  for (const line of jsonl.split(/\r?\n/)) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (entry.timestamp) [first, last] = [first ?? entry.timestamp, entry.timestamp];
+    const message = entry.type === 'assistant' ? entry.message : null;
+    if (!message?.usage) continue;
+    messages.set(message.id ?? entry.uuid, message.usage);
+    model = message.model ?? model;
+  }
+  const sum = (key) => [...messages.values()].reduce((total, u) => total + (u[key] ?? 0), 0);
+  return {
+    model: model ?? 'unknown',
+    started: first ?? 'unknown',
+    seconds: first ? Math.round((Date.parse(last) - Date.parse(first)) / 1000) : 0,
+    input: sum('input_tokens'),
+    cacheWrite: sum('cache_creation_input_tokens'),
+    cacheRead: sum('cache_read_input_tokens'),
+    output: sum('output_tokens'),
+  };
+}
 
 export const PROJECTS = join(homedir(), '.claude', 'projects');
 // ponytail: $/MTok as of 2026-10 (claude-api skill), 5-minute cache writes; only weights runs within a reconciled

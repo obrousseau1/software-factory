@@ -5,19 +5,15 @@ export const Role = Object.freeze({
   Explorer: 'explorer',
   Profiler: 'profiler',
   Architect: 'architect',
-  Twin: 'twin',
-  Solo: 'solo',
-  Challenger: 'challenger',
-  SpecValidator: 'spec-validator',
-  SecurityValidator: 'security-validator',
-  StandardsValidator: 'standards-validator',
-  UxValidator: 'ux-validator',
+  Builder: 'builder',
+  Reviewer: 'reviewer',
+  SecurityReviewer: 'security-reviewer',
 });
 
-export const VALIDATORS = [Role.SpecValidator, Role.SecurityValidator, Role.StandardsValidator, Role.UxValidator];
+export const REVIEWERS = [Role.Reviewer, Role.SecurityReviewer];
 
-// A validator writes only its own findings file of a round (or of a benchmark: solo, duo).
-const findingsFile = (role) => new RegExp(String.raw`^\.liftoff/wo/[^/]+/shreds/\d+/findings/(r\d+|solo|duo)-${role}\.md$`);
+// A reviewer writes only its own findings file of a round.
+const findingsFile = (role) => new RegExp(String.raw`^\.liftoff/wo/[^/]+/shreds/\d+/findings/r\d+-${role}\.md$`);
 
 // Restricted roles → the only repo-relative paths they may write ([] = nothing). A trailing `/` allows a folder;
 // a RegExp matches the whole path.
@@ -25,7 +21,7 @@ export const WRITE_LIMITS = Object.freeze({
   [Role.Explorer]: [],
   [Role.Profiler]: ['.liftoff/profile.md', '.liftoff/proposals/'],
   [Role.Architect]: [],
-  ...Object.fromEntries(VALIDATORS.map((role) => [role, [findingsFile(role)]])),
+  ...Object.fromEntries(REVIEWERS.map((role) => [role, [findingsFile(role)]])),
 });
 
 // Hooks receive `spaceport:profiler`; the bare form is matched too.

@@ -1,6 +1,6 @@
 ---
 name: liftoff
-description: Orchestrate the spaceport software factory - turn a one-line idea into reviewed, tested code through intent, specs, plan, shred, work and validation, with the user approving intent, specs, plan and the final result. Use when the user runs /spaceport:liftoff, or asks to start, resume or check a factory work order.
+description: Orchestrate the spaceport software factory - turn a one-line idea into reviewed, tested code through intent, docs (spec + plan), work and review, with the user approving intent, docs and the final result. Use when the user runs /spaceport:liftoff, or asks to start, resume or check a factory work order.
 argument-hint: "<idea> | resume <id>"
 ---
 
@@ -41,11 +41,9 @@ Read a step file only when entering that step. Never preload them.
 |------|------|------------|
 | Explore (first run on a repo) | [steps/explore.md](steps/explore.md) | — |
 | Intent | [steps/intent.md](steps/intent.md) | ✋ interactive |
-| Specs | [steps/specs.md](steps/specs.md) | ✋ approve |
-| Plan | [steps/plan.md](steps/plan.md) | — |
-| Shred | [steps/shred.md](steps/shred.md) | ✋ approve plan + shreds |
+| Docs | [steps/docs.md](steps/docs.md) | ✋ approve spec + plan |
 | Work | [steps/work.md](steps/work.md) | ✋ on escalation |
-| Validate | [steps/validate.md](steps/validate.md) | ✋ after 3 failed rounds |
+| Review | [steps/review.md](steps/review.md) | ✋ after 2 failed rounds |
 | Final | [steps/final.md](steps/final.md) | ✋ approve |
 
 A step file marked **not built yet** means: stop, reply ⚠️ naming the step and its milestone.

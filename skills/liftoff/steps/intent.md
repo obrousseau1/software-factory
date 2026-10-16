@@ -22,4 +22,4 @@ Shape what the user wants, before any solution. `<wo>` is the work-order folder,
 5. **Gate** `[gate <id> intent]`: ask with `AskUserQuestion` to approve the intent; put the filled
    template in the option preview. Options: Approve, Change. On a change, apply it and ask again.
 6. **Approved**: write `<wo>/intent.md` from the template with the `spaceport:amend-doc` skill
-   (Create, step `intent`), then enter the specs step.
+   (Create, step `intent`), then enter the docs step.
