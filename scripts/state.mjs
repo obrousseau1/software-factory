@@ -10,11 +10,11 @@ import { pathToFileURL } from 'node:url';
 import { bodyHash } from './docs.mjs';
 
 const SLUG_MAX = 40;
-export const STEPS = ['intent', 'specs', 'plan', 'shred', 'work', 'validate', 'final'];
+export const STEPS = ['intent', 'docs', 'work', 'review', 'final'];
 
-// Human gate → the doc its approval covers (null: written after approval). A step needs every gate of an
-// earlier step approved, with its doc unchanged since.
-export const GATES = Object.freeze({ intent: null, specs: 'spec.md', shred: 'plan.md', final: null });
+// Human gate → the docs its approval covers ([]: written after approval). A step needs every gate of an
+// earlier step approved, with its docs unchanged since.
+export const GATES = Object.freeze({ intent: [], docs: ['spec.md', 'plan.md'], final: [] });
 
 export function woRoot(repo) {
   return join(repo, '.liftoff', 'wo');
@@ -69,18 +69,18 @@ function docHash(repo, id, doc) {
 export function approve(repo, id, gate, now = new Date()) {
   if (!(gate in GATES)) throw new Error(`Unknown gate: ${gate}`);
   const state = getWorkOrder(repo, id);
-  const hash = GATES[gate] && docHash(repo, id, GATES[gate]);
-  return saveState(repo, { ...state, approvals: { ...state.approvals, [gate]: { at: now.toISOString(), hash } } });
+  const hashes = Object.fromEntries(GATES[gate].map((doc) => [doc, docHash(repo, id, doc)]));
+  return saveState(repo, { ...state, approvals: { ...state.approvals, [gate]: { at: now.toISOString(), hashes } } });
 }
 
 function gateErrors(repo, state, step) {
   return Object.entries(GATES)
     .filter(([gate]) => STEPS.indexOf(gate) < STEPS.indexOf(step))
-    .map(([gate, doc]) => {
+    .map(([gate, docs]) => {
       const approval = state.approvals?.[gate];
       if (!approval) return `${gate} is not approved by the user`;
-      if (doc && approval.hash !== docHash(repo, state.id, doc)) return `${doc} changed since the ${gate} approval`;
-      return null;
+      const changed = docs.filter((doc) => approval.hashes?.[doc] !== docHash(repo, state.id, doc));
+      return changed.length ? `${changed.join(', ')} changed since the ${gate} approval` : null;
     })
     .filter(Boolean);
 }

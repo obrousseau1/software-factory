@@ -19,7 +19,7 @@ rounds; a hook denies twin and validator spawns once a shred is escalated.
    with `AskUserQuestion`:
    - **Stop**: the shred stays escalated, its worktree kept for inspection. The work order halts.
    - **Amend spec**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/shred.mjs" drop <id> <n>`, then
-     `spaceport:amend-doc` on `spec.md` with the user's change; it sends you back to the specs gate.
+     `spaceport:amend-doc` on `spec.md` with the user's change; it sends you back to the docs gate.
 
 Never edit findings, never skip a validator, never decide a finding yourself: the twins fix or
 reject it in the fix turn, and escalate spec gaps (work step 6).

@@ -11,7 +11,7 @@ const script = fileURLToPath(new URL('../scripts/docs.mjs', import.meta.url));
 const changelog = '## Changelog\n| Date | Step | Change | Why |\n|---|---|---|---|\n| 2026-10-14 | specs | Created | Draft approved |\n';
 
 const intent = `---\nsize: feature\n---\n# Intent\n\nProblem.\n\n${changelog}`;
-const spec = `# Spec\n\n### R-01: Add item\n- given…\n\n### R-02: Remove item\n- given…\n\n${changelog}`;
+const spec = `# Spec\n\n### R-01: Add item\n- given…\n- Test: automated — AddTests\n\n### R-02: Remove item\n- given…\n- Test: manual — remove one\n\n${changelog}`;
 const shredTable = (rows) => `# Plan\n\n## Shreds\n| # | Title | Requirements | Region | Depends on | UX |\n|---|---|---|---|---|---|\n${rows}\n\n${changelog}`;
 const plan = shredTable('| 1 | Add | R-01 | src/add | — | none |\n| 2 | Remove | R-02 | src/remove | 1 | simple |');
 
@@ -47,6 +47,13 @@ test('intent needs a size', () => {
 test('spec needs unique requirements', () => {
   assert.deepEqual(checkDocs(wo({ 'spec.md': `# Spec\n\n${changelog}` })), ['spec.md: no requirements (### R-01: ...)']);
   assert.deepEqual(checkDocs(wo({ 'spec.md': spec.replace('R-02', 'R-01') })), ['spec.md: R-01 is duplicated']);
+});
+
+test('every requirement says how it is tested', () => {
+  const untested = spec.replace('- Test: manual — remove one', '- Test: someday');
+  assert.deepEqual(checkDocs(wo({ 'spec.md': untested })), ['spec.md: R-02 has no "- Test: automated|manual" line']);
+  const nextSection = `# Spec\n\n### R-01: Add\n- given…\n\n## Out of scope\n- Test: automated — not here\n\n${changelog}`;
+  assert.deepEqual(checkDocs(wo({ 'spec.md': nextSection })), ['spec.md: R-01 has no "- Test: automated|manual" line']);
 });
 
 test('every requirement in exactly one shred, none unknown', () => {

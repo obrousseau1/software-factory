@@ -32,6 +32,12 @@ export const changelogRows = (md) => section(md, 'Changelog')
 
 export const requirements = (md) => [...md.matchAll(/^### (R-\d{2,})\b/gm)].map((m) => m[1]);
 
+// Requirements whose section has no `- Test: automated|manual …` line.
+const TEST_LINE = /^- Test: (automated|manual)\b/m;
+export const untested = (md) => md.split(/^(?=### R-\d{2,})/m).slice(1)
+  .filter((block) => !TEST_LINE.test(block.split(/^## /m)[0]))
+  .map((block) => requirements(block)[0]);
+
 // `| # | Title | Requirements | Region | Depends on | UX |` rows under `## Shreds`.
 export function shreds(md) {
   return section(md, 'Shreds')
@@ -96,6 +102,7 @@ export function checkDocs(woDir) {
     ids = requirements(spec);
     if (!ids.length) errors.push('spec.md: no requirements (### R-01: ...)');
     for (const id of duplicates(ids)) errors.push(`spec.md: ${id} is duplicated`);
+    for (const id of untested(spec)) errors.push(`spec.md: ${id} has no "- Test: automated|manual" line`);
   }
   if (plan !== null) errors.push(...checkPlan(plan, ids));
   return errors;

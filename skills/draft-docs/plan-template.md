@@ -14,7 +14,7 @@
 ## Shreds
 | # | Title | Requirements | Region | Depends on | UX |
 |---|-------|--------------|--------|------------|----|
-| 1 | <title> | R-01, R-02 | <folder or files> | — | none |
+| 1 | <title> | R-01, R-02 | <code folder or files>; <test file> | — | none |
 
 ## Decisions
 | Decision | Rejected | Why | By |
