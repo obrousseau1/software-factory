@@ -53,13 +53,22 @@ test('open prints the builder prompt, with only builder lessons', () => {
   assert.equal(getWorkOrder(repo, ID).shreds[0].prompt, undefined);
 });
 
-test('an incomplete build: every requirement tested, no TODO', () => {
+test('an incomplete build: each spec Test file changed, no TODO; manual tests need none', () => {
   const { repo, worktree } = opened();
-  write(worktree, TEST_FILE, `${SEED_TEST}\nR-01 adds\n`);
-  write(worktree, 'src/calc.js', 'export const add = (a, b) => a + b; // TODO R-02\n');
+  write(worktree, TEST_FILE, `${SEED_TEST}\nadds\n`);
+  write(worktree, 'src/calc.js', 'export const add = (a, b) => a + b; // TODO subtract\n');
   const errors = checkBuild(repo, ID, 1);
-  assert.ok(errors.includes('R-02: no changed test references it'), errors.join('\n'));
-  assert.ok(errors.includes('src/calc.js: TODO / NotImplemented left in the diff'), errors.join('\n'));
+  assert.deepEqual(errors, [
+    'src/calc.js: TODO / NotImplemented left in the diff',
+    'R-02: test file tests/sub.test.js (spec Test line) has no change',
+  ]);
+});
+
+test('a requirement without a spec Test line is incomplete', () => {
+  const { repo, worktree } = opened();
+  buildAll(worktree);
+  write(repo, `.liftoff/wo/${ID}/spec.md`, '# Spec\n\n### R-01: Add\n- Test: automated — tests/calc.test.js: adds\n');
+  assert.deepEqual(checkBuild(repo, ID, 1), ['R-02: no Test line in spec.md']);
 });
 
 test('removing a committed test line is flagged; deleting the file too', () => {
@@ -109,6 +118,14 @@ test('gates of an unchanged tree are served from cache; any change runs them aga
   runGates(repo, worktree);
   assert.equal(gateRuns(worktree), base + 2);
   assert.equal(git(worktree, 'status', '--porcelain', '--', 'src/new.js').trim(), '?? src/new.js', 'index untouched');
+});
+
+test('gates share one time budget; once spent, the rest are red without running', () => {
+  const { repo, worktree } = opened();
+  write(worktree, 'src/calc.js', 'changed\n');
+  const errors = runGates(repo, worktree, 1);
+  assert.equal(errors.length, 2, errors.join('\n'));
+  assert.equal(errors[1], 'gate test red: not run: gate time budget spent');
 });
 
 test('a red gate is not cached', () => {

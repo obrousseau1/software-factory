@@ -20,7 +20,7 @@ Blocking findings cost a whole fix round. Only these block:
 |----------|----------|--------|
 | Critical | Data loss, or a flaw exploitable as written | Blocks the round |
 | Major | A requirement clause broken or not tested; new UI not accessible (label, keyboard, focus); a security risk under plausible use; a test that cannot fail | Blocks the round |
-| Minor | Everything else: naming, style, design taste, scope creep, missing edge case the spec does not ask for, test placed outside the Region | Logged, shown at final |
+| Minor | Everything else: naming, style, design taste, scope creep, missing edge case the spec does not ask for, a unit test where a behaviour test would do | Logged, shown at final |
 
 Not on that list → Minor, however strongly you feel. Only the diff is in scope; existing code only
 where the diff makes it wrong.

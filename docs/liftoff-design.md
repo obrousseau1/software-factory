@@ -73,10 +73,11 @@ Liftoff is the **main session**, not a subagent. Everything else is a subagent s
 One spawn per shred. The prompt names the shred's requirements and worktree; the builder reads the
 spec, the plan row and the profile, then goes red → green → refactor per requirement.
 
-- Each requirement's `Test:` line says where and what to assert; tests go in the shred's Region test
-  file, tagged with the profile's `req-tag`. Each test must fail without the code it covers.
+- Each requirement's `Test:` line names the test file and what to assert. Behaviour tests first (what
+  the user experiences, edge cases they hit, errors they see). No requirement tags in code or tests:
+  `spec.md` holds the traceability. Each test must fail without the code it covers.
 - Hooks (§7) keep it in the worktree, protect committed test lines, and block its stop until the build
-  is complete (gates green, no `TODO`, every `R-xx` in a changed test).
+  is complete (gates green, no `TODO`, each automated `R-xx`'s `Test:` file changed).
 - `shred.mjs built` re-checks after it returns (a dropped block is caught here), commits, marks the shred
   `built`. Refused → liftoff sends the errors back to the same builder once.
 - **Fix round.** Blocking review findings come back as one `SendMessage` to the same builder (verified:
@@ -98,8 +99,8 @@ test bloat its own CHALLENGE phase created.
   `review.mjs verdict` reads them; liftoff never transcribes.
 - **Severity rubric** (log-finding). Critical: data loss, or exploitable as written. Major: a
   requirement clause broken or untested; new UI not accessible; a security risk under plausible use; a
-  test that cannot fail. **Everything else is Minor** (naming, taste, scope creep, a test outside the
-  Region). Critical and Major block the round; Minor is shown at final approval.
+  test that cannot fail. **Everything else is Minor** (naming, taste, scope creep, a unit test where a
+  behaviour test would do). Critical and Major block the round; Minor is shown at final approval.
 - A blocking finding may license deleting test lines: the reviewer quotes them under `## Remove`; in the
   fix round only those lines may go (hooks subtract them). A malformed block → the reviewer is re-spawned.
 - Clean round → the shred fast-forwards into the work-order branch `spaceport/<id>`; its worktree is removed.
@@ -168,7 +169,7 @@ one file plus the references the checks list.
 | Living docs owned by liftoff | PreToolUse `Edit\|Write` on `intent/spec/plan.md` | any subagent | Deny |
 | Changelog required | Stop | liftoff | Living doc body changed since last snapshot without a new changelog row → block |
 | Builder writes | PreToolUse `Edit\|Write` | builder | `guard-builder`: path outside the active shred's worktree → deny; removing a committed test line (multiset vs `HEAD`; test files = profile `test-globs`) → deny unless a reviewer licensed it. Bash is not parsed: the build check flags main-repo changes. Fails closed |
-| Build complete | SubagentStop | builder | `guard-builder` → `shred.mjs` checkBuild: no committed test line removed, no main-repo change, no `TODO`/`NotImplemented` in the diff, every shred `R-xx` referenced by a changed test, gates green (cached by tree hash). Blocks ≤3 per build; `shred.mjs built` refuses until it passes. Fails open |
+| Build complete | SubagentStop | builder | `guard-builder` → `shred.mjs` checkBuild: no committed test line removed, no main-repo change, no `TODO`/`NotImplemented` in the diff, the test file each automated shred `R-xx`'s spec `Test:` line names changed, gates green (cached by tree hash, 25-min total budget so the 30-min hook timeout never fails it open). Blocks ≤3 per build; `shred.mjs built` refuses until it passes. Fails open |
 | Human gates | PostToolUse `AskUserQuestion` | liftoff | Question tagged `[gate <id> <gate>]` answered `Approve…` → approval + hash of each gated doc in `state.json`; every answer logged to `gates.log`. `state.mjs step` refuses a step whose earlier gates are unapproved or whose docs changed since |
 | Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json`, `ledger.md` → deny |
 | Round cap | PreToolUse `Agent` | everyone | `guard-spawn`: builder only while a shred is in work, reviewers only while one is reviewing; escalated shred → deny. No work order in the repo → pass. A `SendMessage` resume is not a spawn: the builder hooks still apply |
@@ -179,7 +180,9 @@ one file plus the references the checks list.
 **Gate cache.** `gates.mjs` `runGates` keys a run on the worktree's content (a temp-index `git add -A` +
 `write-tree`, untracked files included, the real index untouched) plus the gate commands, and skips
 gates already green for that key (`.liftoff/gates-green.json`, last 20). Red is never cached: it may be
-flaky. Gitignored files are not part of the key.
+flaky. Gitignored files are not part of the key, so installed dependencies are not either: a changed
+`node_modules` on the same tree is a cache hit. Fine while `setup` is lockfile-exact; add the lockfile hash
+to the key if flakiness shows up.
 
 ---
 
@@ -248,11 +251,15 @@ software-factory/
 3. Prints next step: run liftoff; first run triggers the profiler.
 
 **Profile.** The profiler writes `.liftoff/profile.md`: flat frontmatter keys
-(`stack`, `setup`, `gate-format|lint|typecheck|build|test`, `run`, `req-tag`, `test-globs`, `ui-globs`, optional
+(`stack`, `setup`, `gate-format|lint|typecheck|build|test`, `run`, `test-globs`, `ui-globs`, optional
 `sensitive-globs`; `none` = n/a) + architecture, folder
 roles, conventions. The profiler infers without running anything; liftoff runs the gates (`run-gates`) and
 re-spawns the profiler on failure (max 2). Known stacks are cue files (`skills/explore-repo/stacks/`), each
 with a fixture + eval; an unknown repo gets `stack: other` and a proposal in `.liftoff/proposals/<shape>/`.
+
+**Migrating a profile to M9.** A profile written before M9 has no `sensitive-globs`, so the Opus
+security reviewer runs every round there (safe, no saving). Add the key by hand, or delete the profile
+and let the profiler rewrite it. Its `req-tag` key is now ignored.
 
 **Stacks** (for empty repos only): `.NET + React/TypeScript/Vite`, `MAUI` (Windows target only).
 Each template is a `recipe.json` (shell commands running the official generators, plus regex
@@ -326,11 +333,11 @@ None. Agent names are provisional (§7).
 | 1 | Plugin skeleton, install script, `liftoff` map skill, reply contract, `.liftoff/` state, test harness (script tests + static checks), eval spike | Installs into an empty test repo; liftoff starts and answers in contract format; `node --test` green; one eval runs end to end |
 | 2 | Explorer + `profile.md` | Profile generated correctly for a .NET+React repo and a MAUI repo |
 | 3 | Intent → specs → plan → shred, architect, `amend-doc`, changelog hook | A sample idea produces approved intent/spec/plan with `R-xx` IDs and changelogs |
-| 4 | Twin rotation, worktrees, phase + completeness hooks | One shred built through BUILD/CHALLENGE/REFACTOR in its worktree; hooks block a twin deleting a test |
-| 5 | Validators, loop, round cap, escalation | Seeded defect caught, routed, fixed; 4th round denied |
+| 4 | Twin rotation, worktrees, phase + completeness hooks *(twins superseded by M9)* | One shred built through BUILD/CHALLENGE/REFACTOR in its worktree; hooks block a twin deleting a test |
+| 5 | Validators, loop, round cap, escalation *(validators superseded by M9)* | Seeded defect caught, routed, fixed; 4th round denied |
 | 6 | Ledger hook, postmortem, `lessons.md` | Ledger shows real tokens/time per run; lessons written |
 | 7 | Stack templates for empty repos | Idea → new app walking skeleton on both stacks |
-| 8 | Solo baseline benchmark | One agent builds a landed shred from the same spec + base commit in its own worktree; the same validators grade it once. Report: tokens, time, $, blocking findings, tests per `R-xx`, twins vs solo |
+| 8 | Solo baseline benchmark *(removed in M9)* | One agent builds a landed shred from the same spec + base commit in its own worktree; the same validators grade it once. Report: tokens, time, $, blocking findings, tests per `R-xx`, twins vs solo |
 | 9 | Lean line: docs step, builder, reviewer | Steps `intent, docs, work, review, final` with 3 human gates; twins, validators and the benchmark removed; build hook re-blocks up to 3; gates cached by tree hash; architect, reviewer and security-reviewer evals pass |
 
 M8 verdict (sandbox + NHL, four runs): twins cost 3-6× and took 4-6× longer than one agent for the same

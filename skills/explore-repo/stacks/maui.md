@@ -21,11 +21,6 @@
 | gate-test | `dotnet test <tests>` |
 | run | `dotnet build <app> -t:Run -f <tfm>` |
 
-## req-tag
-
-xUnit: `[Trait("Req", "R-01")]`. NUnit: `[Property("Req", "R-01")]`. MSTest:
-`[TestProperty("Req", "R-01")]`.
-
 ## test-globs
 
 The test projects' folders, e.g. `<Name>.Tests/**`.

@@ -24,11 +24,6 @@ Package manager from the lock file (`pnpm-lock.yaml` → `pnpm --dir <web>`, `pa
 | gate-test | `dotnet test <sln> && <pm> test` (non-watch, e.g. `vitest run`) |
 | run | `dotnet run --project <api csproj>` *(the web dev server is started separately)* |
 
-## req-tag
-
-xUnit: `[Trait("Req", "R-01")]`. NUnit: `[Property("Req", "R-01")]`. MSTest:
-`[TestProperty("Req", "R-01")]`. Vitest/Jest: test name starts with `R-01:`.
-
 ## test-globs
 
 The .NET test projects' folders plus the web test files, e.g. `tests/**, <web>/src/**/*.test.ts, <web>/src/**/*.test.tsx`.

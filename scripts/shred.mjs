@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { shreds } from './docs.mjs';
+import { shreds, testLines } from './docs.mjs';
 import { runGates, runSetup } from './gates.mjs';
 import { lessonsNote } from './lessons.mjs';
 import { isTest, profilePath, readProfile } from './profile.mjs';
@@ -156,15 +156,21 @@ export function testLineErrors(shred, profile) {
     .map(([path, removed]) => `${path}: removed committed test lines, restore them: "${removed[0]}"`);
 }
 
-// Shred complete: nothing unfinished in its diff, every requirement referenced by a changed test.
+// Shred complete: nothing unfinished in its diff, the test file each automated requirement's spec `Test:` line names
+// changed. Tests carry no requirement tag: spec.md holds the traceability.
 export function shredErrors(repo, id, shred, profile) {
   const changed = changes(shred.worktree, shred.base);
   const errors = changed
     .filter(({ before, after }) => removedLines(after, before).some((line) => UNFINISHED.test(line)))
     .map(({ path }) => `${path}: TODO / NotImplemented left in the diff`);
-  const tests = changed.filter(({ path, after }) => after !== null && isTest(profile, path));
+  const tests = new Set(changed.filter(({ path, after }) => after !== null && isTest(profile, path)).map(({ path }) => path));
+  const lines = testLines(readFileSync(join(woRoot(repo), id, 'spec.md'), 'utf8'));
   for (const req of planShred(repo, id, shred.n).reqs) {
-    if (!tests.some(({ after }) => after.includes(req))) errors.push(`${req}: no changed test references it`);
+    const line = lines[req];
+    if (!line) errors.push(`${req}: no Test line in spec.md`);
+    else if (line.kind === 'automated' && !tests.has(line.file.replace(/^\.\//, '').replaceAll('\\', '/'))) {
+      errors.push(`${req}: test file ${line.file} (spec Test line) has no change`);
+    }
   }
   return errors;
 }

@@ -36,7 +36,7 @@ Copy [profile-template.md](profile-template.md) to the profile path and fill eve
 - Every command runs from the repo root, in bash, chained with `&&`.
 - `gate-format` and `gate-lint` **check**, never rewrite (`--check`, `--verify-no-changes`).
 - `none` only when the repo truly has no such tool. `stack`, `gate-build`, `gate-test`,
-  `req-tag` and `test-globs` are never `none`.
+  `test-globs` is never `none`.
 - Never name a tool the repo doesn't have. If unsure, prefer the plainest command.
 - Fill **Gate sources**: where each command came from (file, or "stack default").
 

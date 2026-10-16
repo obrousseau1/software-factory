@@ -38,14 +38,16 @@ choice, the options rejected (from your brainstorm or the question asked), and w
 - Each ends with one `- Test:` line: `automated — <test file>: <what it asserts>`, or, only for
   what a test cannot see (look, feel, a real device), `manual — <how to check>`. A test that would
   pass with the feature removed is not a test: name the assertion that fails without it.
+- The test file is a repo-relative path (a hook checks the build changed it). Prefer an existing
+  test file, and the widest test level the repo supports: what the user experiences, the edge
+  cases they hit, the error messages they see.
 - Nothing the intent puts out of scope. Size `app` → R-01 is the walking skeleton (builds, one
   screen or endpoint, one passing test).
 
 **Plan rules**
 - Every `R-xx` of the spec in exactly one shred. A shred: one region of code, independently
   shippable, ordered so dependencies come first; `Depends on` lists earlier shred numbers or `—`.
-- Region names the code folder or files and the test file(s) its `Test:` lines name. Prefer an
-  existing test file next to the code over a new one.
+- Region names the code folder or files the shred changes.
 - UX per shred: `none` (no UI change), `simple` (UI code review), `deep` (needs a running app).
 - Name real files and patterns from the repo; reuse before adding.
 

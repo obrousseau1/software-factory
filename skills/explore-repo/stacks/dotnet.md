@@ -22,11 +22,6 @@
 | gate-test | `dotnet test <sln>` + the CI `--filter`, if any |
 | run | `dotnet run --project <host csproj>` *(the `Microsoft.NET.Sdk.Web` or `Worker` project)* |
 
-## req-tag
-
-xUnit: `[Trait("Req", "R-01")]`. NUnit: `[Property("Req", "R-01")]`. MSTest:
-`[TestProperty("Req", "R-01")]`.
-
 ## test-globs
 
 The test projects' folders, e.g. `tests/**` or `<Name>.Tests/**`.

@@ -19,7 +19,6 @@ const valid = {
   'gate-build': 'dotnet build App.csproj',
   'gate-test': 'dotnet test',
   run: 'none',
-  'req-tag': '[Trait("Req", "R-01")]',
   'test-globs': 'tests/**, **/*Tests.cs',
   'ui-globs': '**/*.xaml',
 };
@@ -73,7 +72,8 @@ test('gates skip none, keep order', () => {
 });
 
 test('readProfile parses frontmatter, keeps quotes inside values', () => {
-  assert.equal(readProfile(writeProfile(valid))['req-tag'], '[Trait("Req", "R-01")]');
+  const run = 'dotnet run --project "src/App/App.csproj" -c Release';
+  assert.equal(readProfile(writeProfile({ ...valid, run })).run, run);
 });
 
 test('readProfile throws on a missing file', () => {

@@ -9,13 +9,16 @@ You are a senior programmer. The prompt gives the work order, the shred, its req
 worktree. Build every requirement.
 
 Read the requirements in `<repo>/.liftoff/wo/<id>/spec.md`, the shred row in `plan.md`, and
-`<repo>/.liftoff/profile.md` (gate commands, `req-tag`, `test-globs`, conventions).
+`<repo>/.liftoff/profile.md` (gate commands, `test-globs`, conventions).
 
 For each requirement: red → green → refactor.
-- Its `Test:` line says where and what to assert. Put tests in the shred's Region test file; tag
-  them with `req-tag`.
-- One test per clause of the requirement. Each must fail without the code it covers: no
-  duplicates, no tests of the framework, no assertions that always pass.
+- Its `Test:` line names the test file and what to assert; write the tests there. No requirement
+  tags or IDs in code or test names: `spec.md` holds the traceability.
+- Prefer behaviour tests at the widest level the repo supports: what the user experiences, the
+  edge cases they can hit, the error messages they can see. Unit-test internals only where a
+  behaviour test cannot reach them.
+- Each test must fail without the code it covers: no duplicates, no tests of the framework, no
+  assertions that always pass.
 - Run the profile's gates before you stop.
 
 ## Fix round
@@ -30,7 +33,7 @@ again, then report.
 - Added a dependency: run the profile's `setup` in the worktree.
 - Never edit `.liftoff/`, never commit, never touch git branches.
 - A hook blocks your stop until gates are green, nothing is left `TODO` / `NotImplemented`, every
-  requirement is referenced by a changed test, and no committed test line is gone.
+  automated requirement's `Test:` file changed, and no committed test line is gone.
 
 ## Report
 

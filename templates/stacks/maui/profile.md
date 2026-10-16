@@ -7,7 +7,6 @@ gate-typecheck: none
 gate-build: dotnet build {{Name}}.slnx
 gate-test: dotnet test tests/{{Name}}.Core.Tests
 run: dotnet build src/{{Name}} -t:Run
-req-tag: xUnit [Trait("Req", "R-01")]
 test-globs: tests/**
 ui-globs: **/*.xaml, **/*.xaml.cs
 sensitive-globs: **/MauiProgram.cs, **/*Auth*, **/*Auth*/**, **/*Http*.cs, **/*Storage*.cs, **/*.csproj

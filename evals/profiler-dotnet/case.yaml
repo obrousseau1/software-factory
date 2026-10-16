@@ -1,6 +1,6 @@
 schema_version: "1.0"
 name: profiler-dotnet
-description: Profiler profiles a .NET-only backend, taking the CI test filter and the NUnit req-tag.
+description: Profiler profiles a .NET-only backend, taking the CI test filter.
 tags: [profiler]
 context:
   add_dirs: [fixture]
@@ -33,11 +33,6 @@ graders:
     name: test-ci-filter
     target: { source: file, path: .liftoff/profile.md }
     pattern: '^gate-test: .*dotnet test.*Category!=Integration'
-    flags: m
-  - type: regex
-    name: req-tag-nunit
-    target: { source: file, path: .liftoff/profile.md }
-    pattern: '^req-tag: .*Property'
     flags: m
   - type: regex
     name: no-ui

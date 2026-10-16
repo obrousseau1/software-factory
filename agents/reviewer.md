@@ -19,11 +19,12 @@ Invoke `spaceport:log-finding` and follow it: its rubric decides every severity.
 **Tests**
 - Each test fails if the clause it covers breaks: no tautology, no duplicate, not only "a mock was
   called". One that cannot fail: license its deletion in `## Remove`.
-- New test files sit in the plan's Region.
+- Behaviour first: tests exercise what the user experiences, the edge cases they can hit and the
+  errors they can see; internals only where behaviour cannot reach.
+- No requirement tags or IDs in code or tests.
 
 **Standards** (`profile.md` conventions)
-- Code lands where the Region says; follows the repo's naming and patterns; reuses existing helpers;
-  no dead code.
+- Follows the repo's naming and patterns; reuses existing helpers; no dead code.
 
 **UX** (the prompt's level; `none` → skip; `simple` → read the UI code, profile `ui-globs`)
 - Each UI acceptance criterion reachable and visible; loading / empty / error / disabled states

@@ -32,11 +32,14 @@ export const changelogRows = (md) => section(md, 'Changelog')
 
 export const requirements = (md) => [...md.matchAll(/^### (R-\d{2,})\b/gm)].map((m) => m[1]);
 
-// Requirements whose section has no `- Test: automated|manual …` line.
-const TEST_LINE = /^- Test: (automated|manual)\b/m;
-export const untested = (md) => md.split(/^(?=### R-\d{2,})/m).slice(1)
-  .filter((block) => !TEST_LINE.test(block.split(/^## /m)[0]))
-  .map((block) => requirements(block)[0]);
+// Each requirement's `- Test:` line: { 'R-01': { kind: 'automated' | 'manual', file } }, null when it has none.
+// `file` is the test file an automated line names first (`automated — <file>: <assertion>`), else null.
+const TEST_LINE = /^- Test: (automated|manual)\b(?:\s*[—–-]+\s*`?([^\s`:]+))?/m;
+export const testLines = (md) => Object.fromEntries(md.split(/^(?=### R-\d{2,})/m).filter((block) => block.startsWith('### R-')).map((block) => {
+  const match = block.split(/^## /m)[0].match(TEST_LINE);
+  const line = match && { kind: match[1], file: match[1] === 'automated' ? (match[2] ?? null) : null };
+  return [requirements(block)[0], line];
+}));
 
 // `| # | Title | Requirements | Region | Depends on | UX |` rows under `## Shreds`.
 export function shreds(md) {
@@ -102,7 +105,10 @@ export function checkDocs(woDir) {
     ids = requirements(spec);
     if (!ids.length) errors.push('spec.md: no requirements (### R-01: ...)');
     for (const id of duplicates(ids)) errors.push(`spec.md: ${id} is duplicated`);
-    for (const id of untested(spec)) errors.push(`spec.md: ${id} has no "- Test: automated|manual" line`);
+    for (const [id, line] of Object.entries(testLines(spec))) {
+      if (!line) errors.push(`spec.md: ${id} has no "- Test: automated|manual" line`);
+      else if (line.kind === 'automated' && !line.file) errors.push(`spec.md: ${id} Test line names no test file`);
+    }
   }
   if (plan !== null) errors.push(...checkPlan(plan, ids));
   return errors;

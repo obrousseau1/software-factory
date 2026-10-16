@@ -9,8 +9,8 @@ import { frontmatter } from './frontmatter.mjs';
 export const NONE = 'none';
 export const GATES = ['format', 'lint', 'typecheck', 'build', 'test'];
 
-const KEYS = ['stack', 'setup', ...GATES.map((gate) => `gate-${gate}`), 'run', 'req-tag', 'test-globs', 'ui-globs'];
-const REQUIRED = ['stack', 'gate-build', 'gate-test', 'req-tag', 'test-globs'];
+const KEYS = ['stack', 'setup', ...GATES.map((gate) => `gate-${gate}`), 'run', 'test-globs', 'ui-globs'];
+const REQUIRED = ['stack', 'gate-build', 'gate-test', 'test-globs'];
 
 export function profilePath(repo) {
   return join(repo, '.liftoff', 'profile.md');

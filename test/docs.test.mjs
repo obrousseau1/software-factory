@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { body, changelogRows, checkDocs, requirements, shreds } from '../scripts/docs.mjs';
+import { body, changelogRows, checkDocs, requirements, shreds, testLines } from '../scripts/docs.mjs';
 
 const script = fileURLToPath(new URL('../scripts/docs.mjs', import.meta.url));
 const changelog = '## Changelog\n| Date | Step | Change | Why |\n|---|---|---|---|\n| 2026-10-14 | specs | Created | Draft approved |\n';
@@ -52,6 +52,10 @@ test('spec needs unique requirements', () => {
 test('every requirement says how it is tested', () => {
   const untested = spec.replace('- Test: manual — remove one', '- Test: someday');
   assert.deepEqual(checkDocs(wo({ 'spec.md': untested })), ['spec.md: R-02 has no "- Test: automated|manual" line']);
+  const noFile = spec.replace('- Test: automated — AddTests', '- Test: automated');
+  assert.deepEqual(checkDocs(wo({ 'spec.md': noFile })), ['spec.md: R-01 Test line names no test file']);
+  assert.deepEqual(testLines(spec), { 'R-01': { kind: 'automated', file: 'AddTests' }, 'R-02': { kind: 'manual', file: null } });
+  assert.deepEqual(testLines('### R-03: x\n- Test: automated — `tests/a.test.js`: adds\n')['R-03'].file, 'tests/a.test.js');
   const nextSection = `# Spec\n\n### R-01: Add\n- given…\n\n## Out of scope\n- Test: automated — not here\n\n${changelog}`;
   assert.deepEqual(checkDocs(wo({ 'spec.md': nextSection })), ['spec.md: R-01 has no "- Test: automated|manual" line']);
 });

@@ -61,7 +61,7 @@ test('cli: write denied on malformed input (fails closed)', () => {
 test('stop is blocked while the build is incomplete, re-blocked up to MAX_BLOCKS', () => {
   const { repo, worktree } = opened();
   const input = { agent_type: 'spaceport:builder', cwd: worktree, hook_event_name: 'SubagentStop', stop_hook_active: true };
-  for (let i = 0; i < MAX_BLOCKS; i++) assert.match(stop(input).reason, /Shred 1 is not complete: R-01: no changed test references it/);
+  for (let i = 0; i < MAX_BLOCKS; i++) assert.match(stop(input).reason, /Shred 1 is not complete: R-01: test file tests\/calc\.test\.js \(spec Test line\) has no change/);
   assert.equal(stop(input), null);
   assert.equal(getWorkOrder(repo, ID).shreds[0].blocks, MAX_BLOCKS);
 });
