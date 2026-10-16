@@ -33,13 +33,21 @@ function landed() {
 
 const run = (agent, role, model, started, tokens) => ({ agent, role, model, started, seconds: 10, input: tokens, cacheWrite: 0, cacheRead: 0, output: tokens });
 
-test('open refuses a shred not landed, or landed before M8', () => {
+test('open refuses a shred never validated, or opened before M8', () => {
   const { repo } = built();
-  assert.throws(() => openBench(repo, ID, 1), /not landed/);
+  assert.throws(() => openBench(repo, ID, 1), /never validated/);
   const old = landed();
   const state = getWorkOrder(old, ID);
   saveState(old, { ...state, shreds: state.shreds.map(({ opened, ...s }) => s) });
-  assert.throws(() => openBench(old, ID, 1), /no opened \/ landedAt/);
+  assert.throws(() => openBench(old, ID, 1), /no opened time/);
+});
+
+test('open accepts a shred stopped after a failed round', () => {
+  const { repo } = built();
+  startRound(repo, ID, 1);
+  findings(repo, 'r1', { 'spec-validator': '| 1 | Major | x | y |\n' });
+  assert.equal(verdict(repo, ID, 1).pass, false);
+  assert.equal(openBench(repo, ID, 1).agent, 'spaceport:solo');
 });
 
 test('open: solo worktree at the shred base, prompt names the requirements', () => {

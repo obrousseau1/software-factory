@@ -1,5 +1,6 @@
-// Solo baseline benchmark (design §15, milestone 8). Run once by hand on a landed shred, before final approval
-// (the ledger stops logging after it). Usage:
+// Solo baseline benchmark (design §15, milestone 8). Run once by hand on a validated shred (landed or
+// stopped), before final approval (the ledger stops logging after it). The twins' window ends when the shred landed,
+// else when the bench opened. Usage:
 //   node bench.mjs open <id> <n>    → solo worktree from the shred's base; prints the prompt to spawn spaceport:solo with
 //   node bench.mjs round <id> <n>   → commits the solo build, writes diff-solo.patch, prints validator prompts (spawn
 //                                     them in parallel)
@@ -40,8 +41,8 @@ export const activeBench = (repo) => benchWith(repo, 'work');
 export function openBench(repo, id, n) {
   const state = getWorkOrder(repo, id);
   const shred = state.shreds?.find((s) => s.n === n);
-  if (shred?.status !== 'landed') throw new Error(`Shred ${n} is not landed.`);
-  if (!shred.opened || !shred.landedAt) throw new Error(`Shred ${n} has no opened / landedAt time: benchmark a shred landed since M8.`);
+  if (!shred?.opened) throw new Error(`Shred ${n} has no opened time: benchmark a shred opened since M8.`);
+  if (!shred.round) throw new Error(`Shred ${n} was never validated: nothing to compare.`);
   if (shred.bench) throw new Error(`Shred ${n} is already benchmarked.`);
 
   const worktree = join(dirname(repo), `${basename(repo)}.spaceport`, `${id}-${n}-${SOLO}`);
@@ -156,10 +157,11 @@ export function benchReport(repo, id, n) {
   const tests = (label) => testsPerReq(readFileSync(join(dir, `diff-${label}.patch`), 'utf8'), profile, reqs);
 
   // ponytail: runs attributed by start time; anything else spawned during the shred or the bench is counted too.
-  const twins = side(runs.filter((r) => r.started >= shred.opened && r.started <= shred.landedAt), twinRounds, tests(`r${shred.round}`));
+  const twins = side(runs.filter((r) => r.started >= shred.opened && r.started <= (shred.landedAt ?? bench.opened)), twinRounds, tests(`r${shred.round}`));
   const soloSide = side(runs.filter((r) => r.started >= bench.opened), [solo], tests(SOLO));
   const file = join(dir, 'bench.md');
-  writeFileSync(file, render(n, twins, soloSide, bench.incomplete ?? []));
+  const stopped = shred.status === 'landed' ? '' : `\nTwins did not land: shred stopped at ${shred.status}, round ${shred.round}.\n`;
+  writeFileSync(file, render(n, twins, soloSide, bench.incomplete ?? []) + stopped);
   saveBench(repo, state, shred, { ...bench, status: 'done' });
   return { file, twins, solo: soloSide };
 }
