@@ -1,4 +1,6 @@
-# software-factory
+# EXPERIMENTAL - software-factory
+
+### (Probably over-engineered and overkill for many applications. Mostly done for learning purposes)
 
 `spaceport`: a Claude Code plugin that runs an agent software factory. Its orchestrator, **liftoff**,
 turns a one-line idea into reviewed, tested code. Design: [docs/liftoff-design.md](docs/liftoff-design.md).
