@@ -57,7 +57,7 @@ it('R-01 cart loads', () => {
 ```
 ````
 
-Only the quoted lines may go; copy them exactly.
+Only the quoted lines may go; copy them exactly. Close every fence: a malformed block makes liftoff re-spawn you.
 
 ## Report
 

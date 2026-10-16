@@ -1,30 +1,31 @@
 // Solo baseline benchmark (design §15, milestone 8). Run once by hand on a validated shred (landed or
 // stopped), before final approval (the ledger stops logging after it). The twins' window ends when the shred landed,
 // else when the bench opened. Usage:
-//   node bench.mjs open <id> <n>    → solo worktree from the shred's base; prints the prompt to spawn spaceport:solo with
-//   node bench.mjs round <id> <n>   → commits the solo build, writes diff-solo.patch, prints validator prompts (spawn
-//                                     them in parallel)
-//   node bench.mjs report <id> <n>  → writes shreds/<n>/bench.md: twins vs solo
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+//   node bench.mjs open <id> <n>       → solo worktree from the shred's base; prints the prompt to spawn spaceport:solo with
+//   node bench.mjs round <id> <n>      → commits the build, writes diff-<solo|duo>.patch, prints validator prompts (spawn
+//                                        them in parallel)
+//   node bench.mjs challenge <id> <n>  → optional, after the solo round: prints the prompt for spaceport:challenger, one
+//                                        CHALLENGE + REFACTOR pass on the solo build; then `round` again (solo + challenger)
+//   node bench.mjs report <id> <n>     → writes shreds/<n>/bench.md: twins vs solo (vs solo + challenger)
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { PROJECTS, reconcile, tokens } from './costs.mjs';
 import { readRuns } from './ledger.mjs';
 import { lessonsNote } from './lessons.mjs';
 import { isTest, profilePath, readProfile } from './profile.mjs';
 import { PLUGIN, Role } from './roles.mjs';
-import { benchWith, git, mainRepo, mainStatus, planShred, runGates, runSetup, saveShred, shredDir, shredErrors, woBranch } from './shred.mjs';
+import { git, mainRepo, mainStatus, planShred, runGates, runSetup, saveShred, shredDir, shredErrors, shredWhere, testLineErrors, woBranch } from './shred.mjs';
 import { getWorkOrder, woRoot } from './state.mjs';
 import { BLOCKING, findingsPath, roundFindings, validatorsFor } from './validate.mjs';
 
 const SOLO = 'solo';
-// ponytail: $/MTok as of 2026-10 (claude-api skill); update when prices change. Unknown model → cost `?`.
-const PRICES = {
-  'claude-opus-5-5': { input: 4, cacheWrite: 5, cacheRead: 0.2, output: 20 },
-  'claude-sonnet-5-5': { input: 2, cacheWrite: 2.5, cacheRead: 0.2, output: 10 },
-  'claude-haiku-5-5': { input: 0.1, cacheWrite: 0.125, cacheRead: 0.01, output: 0.5 },
+const DUO = 'duo';
+// Build stages: who builds, the label of its diff and findings, the status once its round starts.
+const STAGES = {
+  work: { role: Role.Solo, label: SOLO, next: 'validating' },
+  challenge: { role: Role.Challenger, label: DUO, next: 'duo-validating' },
 };
-const TOKENS = ['input', 'cacheWrite', 'cacheRead', 'output'];
-const tokens = (run, weight = () => 1) => TOKENS.reduce((total, key) => total + run[key] * weight(key), 0);
 
 function benchOf(repo, id, n, ...statuses) {
   const state = getWorkOrder(repo, id);
@@ -36,7 +37,8 @@ function benchOf(repo, id, n, ...statuses) {
 
 const saveBench = (repo, state, shred, bench) => saveShred(repo, state, { ...shred, bench });
 
-export const activeBench = (repo) => benchWith(repo, 'work');
+// The benchmark being built (solo or challenger), across work orders: { state, shred } or null.
+export const activeBench = (repo) => shredWhere(repo, (s) => s.bench?.status in STAGES);
 
 export function openBench(repo, id, n) {
   const state = getWorkOrder(repo, id);
@@ -59,33 +61,47 @@ export function openBench(repo, id, n) {
   return { agent: `${PLUGIN}:${Role.Solo}`, prompt };
 }
 
-// Problems with the solo build; [] = complete. Same bar as the twins' final turn, gates last.
+// After the solo round: one fresh agent challenges and refactors the solo build in the same worktree.
+export function openChallenge(repo, id, n) {
+  const { state, shred, bench } = benchOf(repo, id, n, 'validating');
+  roundFindings(repo, id, n, SOLO);
+  saveBench(repo, state, shred, { ...bench, status: 'challenge', challenged: new Date().toISOString(), blocks: 0, mainStatus: mainStatus(repo) });
+  const { reqs } = planShred(repo, id, n);
+  const prompt = `Work order: ${id}. Shred ${n}: challenge and refactor the build of ${reqs.join(', ')}. Repo: ${repo}. `
+    + `Worktree: ${bench.worktree}.` + lessonsNote(repo, Role.Twin);
+  return { agent: `${PLUGIN}:${Role.Challenger}`, prompt };
+}
+
+// Problems with the build in progress; [] = complete. Same bar as the twins' final turn, gates last.
 export function checkBench(repo, id, shred) {
   const { bench } = shred;
+  const profile = readProfile(profilePath(repo));
   const stray = mainStatus(repo).filter((line) => !bench.mainStatus.includes(line));
   const errors = [
     ...(stray.length ? [`changed outside the worktree, undo: ${stray.join(', ')}`] : []),
-    ...shredErrors(repo, id, { ...bench, n: shred.n }, readProfile(profilePath(repo))),
+    ...testLineErrors(bench, profile),
+    ...shredErrors(repo, id, { ...bench, n: shred.n }, profile),
   ];
   return errors.length ? errors : runGates(repo, bench.worktree);
 }
 
 export function benchRound(repo, id, n) {
-  const { state, shred, bench } = benchOf(repo, id, n, 'work');
+  const { state, shred, bench } = benchOf(repo, id, n, ...Object.keys(STAGES));
+  const { label, next } = STAGES[bench.status];
   const incomplete = checkBench(repo, id, shred);
   git(bench.worktree, 'add', '-A');
-  git(bench.worktree, 'commit', '--allow-empty', '-m', `spaceport ${id} shred ${n} ${SOLO}`);
+  git(bench.worktree, 'commit', '--allow-empty', '-m', `spaceport ${id} shred ${n} ${label}`);
   const dir = shredDir(repo, id, n);
   mkdirSync(join(dir, 'findings'), { recursive: true });
-  const diff = join(dir, `diff-${SOLO}.patch`);
+  const diff = join(dir, `diff-${label}.patch`);
   writeFileSync(diff, git(bench.worktree, 'diff', bench.base, 'HEAD'));
-  saveBench(repo, state, shred, { ...bench, status: 'validating', incomplete });
+  saveBench(repo, state, shred, { ...bench, status: next, incomplete: { ...bench.incomplete, [label]: incomplete } });
 
   const { ux, roles } = validatorsFor(repo, id, n);
   const validators = roles.map((role) => ({
     agent: `${PLUGIN}:${role}`,
-    prompt: `Work order: ${id}. Shred ${n}, solo benchmark (one round, no handoff). Repo: ${repo}. Worktree: ${bench.worktree}. `
-      + `Diff: ${diff}. Findings file: ${findingsPath(repo, id, n, SOLO, role)}.`
+    prompt: `Work order: ${id}. Shred ${n}, ${label} benchmark (one round, no handoff). Repo: ${repo}. Worktree: ${bench.worktree}. `
+      + `Diff: ${diff}. Findings file: ${findingsPath(repo, id, n, label, role)}.`
       + (role === Role.UxValidator ? ` UX level: ${ux === 'deep' ? 'simple' : ux}.` : '') + lessonsNote(repo, role),
   }));
   return { incomplete, validators };
@@ -103,10 +119,14 @@ export function testsPerReq(patch, profile, reqs) {
   return counts;
 }
 
-// $ of one ledger run; NaN when its model has no price.
-export function cost(run) {
-  const price = PRICES[run.model];
-  return price ? tokens(run, (key) => price[key]) / 1e6 : NaN;
+// Runs of every work order's ledger, once per agent: a run lands in whichever work order was current.
+function allRuns(repo) {
+  const root = woRoot(repo);
+  const runs = readdirSync(root)
+    .map((id) => join(root, id, 'ledger.md'))
+    .filter((file) => existsSync(file))
+    .flatMap((file) => readRuns(readFileSync(file, 'utf8')));
+  return [...new Map(runs.map((run) => [run.agent, run])).values()];
 }
 
 const sum = (runs, value) => runs.reduce((total, run) => total + value(run), 0);
@@ -118,7 +138,8 @@ function side(runs, rounds, tests) {
     runs: runs.length,
     seconds: sum(runs, (run) => run.seconds),
     tokens: sum(runs, tokens),
-    cost: sum(runs, cost),
+    cost: sum(runs, (run) => run.cost),
+    unreconciled: runs.filter((run) => !run.reconciled).length,
     rounds: rounds.length,
     blockingFirst: blocking(rounds[0]),
     blockingAll: blocking(all),
@@ -132,48 +153,63 @@ const ROWS = [
   ['Agent seconds', (s) => s.seconds],
   ['Tokens', (s) => s.tokens],
   ['Cost $', (s) => Number.isNaN(s.cost) ? '?' : s.cost.toFixed(2)],
+  ['Runs not reconciled (snapshot $)', (s) => s.unreconciled],
   ['Validation rounds', (s) => s.rounds],
   ['Blocking, round 1', (s) => s.blockingFirst],
   ['Blocking, all rounds', (s) => s.blockingAll],
   ['Minor, all rounds', (s) => s.minor],
 ];
 
-export function render(n, twins, solo, incomplete) {
-  const rows = [...ROWS, ...Object.keys(twins.tests).map((req) => [`Tests ${req}`, (s) => s.tests[req]])]
-    .map(([label, value]) => `| ${label} | ${value(twins)} | ${value(solo)} |`);
-  const note = incomplete.length ? `\nSolo stopped incomplete: ${incomplete.join('; ')}\n` : '';
-  return `# Benchmark: shred ${n}, twins vs solo\n\n| Metric | Twins | Solo |\n|---|---|---|\n${rows.join('\n')}\n${note}`;
+// `sides`: [[title, side]], twins first.
+export function render(n, sides, incomplete) {
+  const reqs = Object.keys(sides[0][1].tests);
+  const rows = [...ROWS, ...reqs.map((req) => [`Tests ${req}`, (s) => s.tests[req]])]
+    .map(([label, value]) => `| ${[label, ...sides.map(([, s]) => value(s))].join(' | ')} |`);
+  const titles = sides.map(([title]) => title);
+  const notes = Object.entries(incomplete).filter(([, errors]) => errors.length)
+    .map(([label, errors]) => `\n${label} stopped incomplete: ${errors.join('; ')}\n`).join('');
+  return `# Benchmark: shred ${n}, ${titles.join(' vs ')}\n\n| Metric | ${titles.join(' | ')} |\n|${'---|'.repeat(titles.length + 1)}\n`
+    + `${rows.join('\n')}\n${notes}`;
 }
 
-export function benchReport(repo, id, n) {
-  const { state, shred, bench } = benchOf(repo, id, n, 'validating', 'done');
-  const solo = roundFindings(repo, id, n, SOLO);
+// `projects`: Claude Code transcripts, for the sessions' true costs (costs.mjs).
+export function benchReport(repo, id, n, projects = PROJECTS) {
+  const { state, shred, bench } = benchOf(repo, id, n, 'validating', 'duo-validating', 'done');
   const twinRounds = Array.from({ length: shred.round }, (_, i) => roundFindings(repo, id, n, `r${i + 1}`));
-  const ledger = join(woRoot(repo), id, 'ledger.md');
-  const runs = existsSync(ledger) ? readRuns(readFileSync(ledger, 'utf8')) : [];
+  const runs = reconcile(allRuns(repo), projects);
   const dir = shredDir(repo, id, n);
   const profile = readProfile(profilePath(repo));
   const { reqs } = planShred(repo, id, n);
   const tests = (label) => testsPerReq(readFileSync(join(dir, `diff-${label}.patch`), 'utf8'), profile, reqs);
+  const between = (from, to) => (r) => r.started >= from && (!to || r.started <= to);
 
   // ponytail: runs attributed by start time; anything else spawned during the shred or the bench is counted too.
-  const twins = side(runs.filter((r) => r.started >= shred.opened && r.started <= (shred.landedAt ?? bench.opened)), twinRounds, tests(`r${shred.round}`));
-  const soloSide = side(runs.filter((r) => r.started >= bench.opened), [solo], tests(SOLO));
+  const sides = [
+    ['Twins', side(runs.filter(between(shred.opened, shred.landedAt ?? bench.opened)), twinRounds, tests(`r${shred.round}`))],
+    ['Solo', side(runs.filter(between(bench.opened, bench.challenged)), [roundFindings(repo, id, n, SOLO)], tests(SOLO))],
+  ];
+  if (existsSync(join(dir, `diff-${DUO}.patch`))) {
+    const build = (r) => r.role === Role.Solo && r.started >= bench.opened;
+    sides.push(['Solo + challenger', side(runs.filter((r) => build(r) || between(bench.challenged)(r)), [roundFindings(repo, id, n, DUO)], tests(DUO))]);
+  }
   const file = join(dir, 'bench.md');
   const stopped = shred.status === 'landed' ? '' : `\nTwins did not land: shred stopped at ${shred.status}, round ${shred.round}.\n`;
-  writeFileSync(file, render(n, twins, soloSide, bench.incomplete ?? []) + stopped);
+  writeFileSync(file, render(n, sides, bench.incomplete ?? {}) + stopped);
   saveBench(repo, state, shred, { ...bench, status: 'done' });
-  return { file, twins, solo: soloSide };
+  return { file, sides: Object.fromEntries(sides) };
 }
+
+const USAGE = 'Usage: bench.mjs open | round | challenge | report <id> <n>';
 
 function main([command, id, n]) {
   const repo = mainRepo(process.cwd());
   const number = Number(n);
-  if (!id || !Number.isInteger(number)) throw new Error('Usage: bench.mjs open | round | report <id> <n>');
+  if (!id || !Number.isInteger(number)) throw new Error(USAGE);
   if (command === 'open') return openBench(repo, id, number);
   if (command === 'round') return benchRound(repo, id, number);
+  if (command === 'challenge') return openChallenge(repo, id, number);
   if (command === 'report') return benchReport(repo, id, number);
-  throw new Error('Usage: bench.mjs open | round | report <id> <n>');
+  throw new Error(USAGE);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

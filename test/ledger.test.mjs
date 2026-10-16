@@ -59,6 +59,16 @@ test('logs to the latest work order not approved at final', () => {
   assert.equal(stop(repo, 'a1'), null);
 });
 
+test('logs to the work order whose shred or benchmark is in progress, even when a later one is open', () => {
+  const repo = makeRepo();
+  write(repo, '.liftoff/wo/009-later/state.json', JSON.stringify({ id: '009-later', step: 'intent' }));
+  assert.equal(currentWorkOrder(repo), '009-later');
+  for (const shred of [{ n: 1, status: 'work' }, { n: 1, status: 'landed', bench: { status: 'validating' } }]) {
+    write(repo, `.liftoff/wo/${ID}/state.json`, JSON.stringify({ id: ID, shreds: [shred] }));
+    assert.equal(currentWorkOrder(repo), ID);
+  }
+});
+
 test('hook fails open on a missing transcript', () => {
   const repo = makeRepo();
   const input = JSON.stringify({ cwd: repo, agent_id: 'a1', agent_type: 'twin', agent_transcript_path: join(repo, 'nope.jsonl') });

@@ -8,7 +8,7 @@ import { activeBench, checkBench } from './bench.mjs';
 import { Role, bare } from './roles.mjs';
 import { MAX_BLOCKS, activeShred, checkTurn, mainRepo, saveShred } from './shred.mjs';
 
-// Solo: blocks while the benchmark build is incomplete; MAX_BLOCKS, then bench.mjs round records what is missing.
+// Solo / challenger: blocks while the benchmark build is incomplete; MAX_BLOCKS, then bench.mjs round records what is missing.
 function decideSolo(repo) {
   const active = activeBench(repo);
   if (!active || active.shred.bench.blocks >= MAX_BLOCKS) return null;
@@ -22,7 +22,7 @@ function decideSolo(repo) {
 // Returns the hook's JSON reply, or null to let the agent stop.
 export function decide(input) {
   const role = bare(input.agent_type);
-  if (role === Role.Solo) return decideSolo(mainRepo(input.cwd));
+  if (role === Role.Solo || role === Role.Challenger) return decideSolo(mainRepo(input.cwd));
   if (role !== Role.Twin) return null;
   const repo = mainRepo(input.cwd);
   const active = activeShred(repo);

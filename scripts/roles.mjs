@@ -7,6 +7,7 @@ export const Role = Object.freeze({
   Architect: 'architect',
   Twin: 'twin',
   Solo: 'solo',
+  Challenger: 'challenger',
   SpecValidator: 'spec-validator',
   SecurityValidator: 'security-validator',
   StandardsValidator: 'standards-validator',
@@ -15,8 +16,8 @@ export const Role = Object.freeze({
 
 export const VALIDATORS = [Role.SpecValidator, Role.SecurityValidator, Role.StandardsValidator, Role.UxValidator];
 
-// A validator writes only its own findings file of a round (or of the solo benchmark).
-const findingsFile = (role) => new RegExp(String.raw`^\.liftoff/wo/[^/]+/shreds/\d+/findings/(r\d+|solo)-${role}\.md$`);
+// A validator writes only its own findings file of a round (or of a benchmark: solo, duo).
+const findingsFile = (role) => new RegExp(String.raw`^\.liftoff/wo/[^/]+/shreds/\d+/findings/(r\d+|solo|duo)-${role}\.md$`);
 
 // Restricted roles → the only repo-relative paths they may write ([] = nothing). A trailing `/` allows a folder;
 // a RegExp matches the whole path.

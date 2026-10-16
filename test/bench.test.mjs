@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { benchReport, benchRound, cost, openBench, testsPerReq } from '../scripts/bench.mjs';
+import { benchReport, benchRound, openBench, openChallenge, testsPerReq } from '../scripts/bench.mjs';
+import { cost } from '../scripts/costs.mjs';
 import { decide as stopDecision } from '../scripts/guard-turn.mjs';
 import { decide as spawnDecision } from '../scripts/guard-spawn.mjs';
 import { render } from '../scripts/ledger.mjs';
@@ -14,6 +16,7 @@ import { ID, TEST_FILE, built, write } from './shred-repo.mjs';
 const CLEAN = '| # | Severity | Where | Finding |\n|---|----------|-------|---------|\n';
 const VALIDATORS = ['spec-validator', 'security-validator', 'standards-validator'];
 const PROFILE = { 'test-globs': 'tests/**' };
+const NO_PROJECTS = join(tmpdir(), 'spaceport-no-projects');
 
 const findings = (repo, label, rows = {}) => {
   for (const role of VALIDATORS) write(shredDir(repo, ID, 1), `findings/${label}-${role}.md`, CLEAN + (rows[role] ?? ''));
@@ -110,13 +113,13 @@ test('report: twins vs solo by time window, blocking, tests per requirement, cos
     run('a4', 'spec-validator', 'mystery', new Date().toISOString(), 1e6),
   ]));
 
-  const { file, twins, solo } = benchReport(repo, ID, 1);
+  const { file, sides: { Twins: twins, Solo: solo } } = benchReport(repo, ID, 1, NO_PROJECTS);
   assert.deepEqual([twins.runs, twins.tokens, twins.cost], [2, 4e6, 24]);
   assert.deepEqual([solo.runs, solo.seconds, Number.isNaN(solo.cost)], [2, 20, true]);
   assert.deepEqual([twins.blockingFirst, solo.blockingFirst, solo.minor], [0, 1, 1]);
   assert.deepEqual(twins.tests, { 'R-01': 1, 'R-02': 1 });
   assert.deepEqual(solo.tests, { 'R-01': 1, 'R-02': 2 });
-  assert.match(readFileSync(file, 'utf8'), /\| Cost \$ \| 24\.00 \| \? \|/);
+  assert.match(readFileSync(file, 'utf8'), /\| Cost \$ \| 24\.00 \| \? \|\n\| Runs not reconciled \(snapshot \$\) \| 2 \| 2 \|/);
   assert.equal(shred(repo).bench.status, 'done');
 });
 
@@ -124,7 +127,7 @@ test('report refuses until every solo findings file exists', () => {
   const repo = landed();
   openBench(repo, ID, 1);
   benchRound(repo, ID, 1);
-  assert.throws(() => benchReport(repo, ID, 1), /Re-spawn these validators/);
+  assert.throws(() => benchReport(repo, ID, 1, NO_PROJECTS), /Re-spawn these validators/);
   assert.equal(existsSync(join(shredDir(repo, ID, 1), 'bench.md')), false);
 });
 
@@ -132,4 +135,30 @@ test('testsPerReq counts added test lines only; cost of an unknown model is NaN'
   const patch = '+++ b/tests/a.test.js\n+R-01 one\n R-01 context\n-R-01 gone\n+++ b/src/a.js\n+R-01 code\n';
   assert.deepEqual(testsPerReq(patch, PROFILE, ['R-01', 'R-02']), { 'R-01': 1, 'R-02': 0 });
   assert.ok(Number.isNaN(cost(run('x', 'solo', 'unknown', '', 1))));
+});
+
+test('challenge: challenger spawns and stops under the same bar; report adds a solo + challenger side', () => {
+  const repo = landed();
+  openBench(repo, ID, 1);
+  const { bench } = shred(repo);
+  write(bench.worktree, TEST_FILE, 'seed test line\nR-01 adds\nR-02 subtracts\n');
+  benchRound(repo, ID, 1);
+  assert.throws(() => openChallenge(repo, ID, 1), /Re-spawn these validators/);
+  findings(repo, 'solo');
+  assert.ok(isDenied(spawn(repo, 'spaceport:challenger')));
+  assert.equal(openChallenge(repo, ID, 1).agent, 'spaceport:challenger');
+  assert.equal(spawn(repo, 'spaceport:challenger'), null);
+  assert.ok(isDenied(spawn(repo, 'spaceport:solo')));
+
+  write(bench.worktree, TEST_FILE, 'R-01 adds\nR-02 subtracts\n');
+  assert.match(stopDecision({ agent_type: 'spaceport:challenger', cwd: repo }).reason, /removed test lines.*seed test line/);
+  write(bench.worktree, TEST_FILE, 'seed test line\nR-01 adds\nR-02 subtracts\nR-02 negatives\n');
+  assert.equal(stopDecision({ agent_type: 'spaceport:challenger', cwd: repo }), null);
+
+  benchRound(repo, ID, 1);
+  assert.equal(spawn(repo, 'spaceport:spec-validator'), null);
+  findings(repo, 'duo');
+  const { file, sides } = benchReport(repo, ID, 1, NO_PROJECTS);
+  assert.deepEqual([sides.Solo.tests['R-02'], sides['Solo + challenger'].tests['R-02']], [1, 2]);
+  assert.match(readFileSync(file, 'utf8'), /\| Metric \| Twins \| Solo \| Solo \+ challenger \|/);
 });

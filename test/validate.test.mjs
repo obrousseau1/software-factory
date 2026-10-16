@@ -138,3 +138,11 @@ test('Remove block licenses the fix turn to delete exactly those test lines', ()
   assert.deepEqual(nextTurn(repo, ID, 1), { done: true });
   assert.equal(shred(repo).licenses, undefined);
 });
+
+test('an unclosed Remove fence asks to re-spawn the validator, licensing nothing', () => {
+  const { repo } = built();
+  startRound(repo, ID, 1);
+  findings(repo, 1, { 'standards-validator': LICENSE.replace(/```\n$/, '') });
+  assert.throws(() => verdict(repo, ID, 1), /Re-spawn these validators: .*r1-standards-validator\.md: ## Remove has 1 blocks, 0 well-formed/);
+  assert.equal(shred(repo).status, 'validating');
+});

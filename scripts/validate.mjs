@@ -59,9 +59,13 @@ export function startRound(repo, id, n) {
 }
 
 // `## Remove` blocks: `### <#> <path>` + a fenced block of the exact test lines finding <#> asks to delete.
-export function parseRemovals(md) {
-  const blocks = section(md, 'Remove').matchAll(/^### (\d+) (\S+)\s*\r?\n```[^\n]*\r?\n([\s\S]*?)^```/gm);
-  return [...blocks].map(([, number, path, text]) => ({ number, path, lines: text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) }));
+// Throws when a block is malformed (e.g. unclosed fence): it would otherwise license nothing, silently.
+export function parseRemovals(md, file) {
+  const remove = section(md, 'Remove');
+  const blocks = [...remove.matchAll(/^### (\d+) (\S+)\s*\r?\n```[^\n]*\r?\n([\s\S]*?)^```/gm)];
+  const headings = remove.match(/^### /gm)?.length ?? 0;
+  if (blocks.length !== headings) throw new Error(`${file}: ## Remove has ${headings} blocks, ${blocks.length} well-formed (### <#> <path> + a closed fence)`);
+  return blocks.map(([, number, path, text]) => ({ number, path, lines: text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) }));
 }
 
 // Rows of a findings file: [{ severity, where, finding, remove }]. Throws when the file is missing or malformed.
@@ -69,7 +73,7 @@ export function parseFindings(file) {
   if (!existsSync(file)) throw new Error(`missing ${file}`);
   const md = readFileSync(file, 'utf8');
   if (!HEADER.test(md)) throw new Error(`${file}: no | # | Severity | Where | Finding | table`);
-  const removals = parseRemovals(md);
+  const removals = parseRemovals(md, file);
   return md.split(/\r?\n/)
     .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()))
     .filter(([number]) => /^\d+$/.test(number ?? ''))

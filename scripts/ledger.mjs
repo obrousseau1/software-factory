@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { section } from './docs.mjs';
 import { bare } from './roles.mjs';
-import { mainRepo } from './shred.mjs';
+import { mainRepo, shredWhere } from './shred.mjs';
 import { getWorkOrder, woRoot } from './state.mjs';
 
 const TEXT = ['agent', 'role', 'model', 'started'];
@@ -43,10 +43,15 @@ export function usage(jsonl) {
   };
 }
 
-// Latest work order not yet approved at final, or null.
+// A shred being built or validated, or a benchmark not done: its runs belong to its work order.
+const inProgress = (shred) => ['work', 'validating'].includes(shred.status) || (shred.bench && shred.bench.status !== 'done');
+
+// Work order with a shred or benchmark in progress, else the latest not yet approved at final; or null.
 export function currentWorkOrder(repo) {
   const root = woRoot(repo);
   if (!existsSync(root)) return null;
+  const active = shredWhere(repo, inProgress);
+  if (active) return active.state.id;
   return readdirSync(root)
     .filter((id) => existsSync(join(root, id, 'state.json')))
     .sort()

@@ -237,7 +237,7 @@ function handoffErrors(repo, id, shred) {
 }
 
 // Test lines committed by earlier turns that this turn removed.
-function testLineErrors(shred, profile) {
+export function testLineErrors(shred, profile) {
   return changes(shred.worktree, 'HEAD')
     .filter(({ path, before }) => before !== null && isTest(profile, path))
     .map(({ path, before, after }) => [path, testRemovals(shred, path, before, after)])

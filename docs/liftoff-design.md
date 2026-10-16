@@ -348,7 +348,9 @@ None. Agent names are provisional (§7).
 stops logging after it): `bench.mjs open <id> <n>` → spawn `spaceport:solo` with its prompt → `bench.mjs round <id> <n>`
 → spawn the printed validators in parallel → `bench.mjs report <id> <n>` writes `shreds/<n>/bench.md`. Ledger runs are
 attributed by start time (twins: shred opened → landed; solo: bench opened →). Twins show round-1 and all-round
-blocking findings; solo is graded once. $ from a price table in `bench.mjs`. The solo worktree is kept.
+blocking findings; solo is graded once. Output tokens and $ are reconciled with each session's `cost-state` (true per-model
+totals, written when the session ends; `costs.mjs`). Runs of a still-open session keep the transcript snapshot,
+which undercounts output. The solo worktree is kept.
 
 ---
 
@@ -379,3 +381,4 @@ blocking findings; solo is graded once. $ from a price table in `bench.mjs`. The
 | 2026-10-15 | Milestone 8: solo baseline benchmark (cost + quality, twins vs one agent) | User: prove the factory's cost buys quality |
 | 2026-10-15 | Milestone 7: `scaffold.mjs` runs a stack recipe (official generators) into an empty repo, writes the profile, commits; template = green base, skeleton built by twins; `.liftoff/roadmap.md` splits an app into work orders | M7 planning; user picked generators, green base, roadmap file, current empty repo |
 | 2026-10-15 | Milestone 8 built: `solo` agent, `bench.mjs` open/round/report, solo completeness in `guard-turn`, bench-aware `guard-spawn`; ledger untouched (time-window attribution) | M8 planning; user picked completeness-only hooks for solo, no skill (one-off), round-1 + all-round comparison, price table |
+| 2026-10-16 | Malformed `## Remove` block → findings rejected (validator re-spawned); bench output tokens and $ reconciled with session `cost-state` | NHL run: an unclosed fence licensed nothing and stalled the shred; transcript output_tokens are stream-start snapshots (~4× low) |
