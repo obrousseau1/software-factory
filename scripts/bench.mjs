@@ -7,7 +7,7 @@
 //   node bench.mjs challenge <id> <n>  → optional, after the solo round: prints the prompt for spaceport:challenger, one
 //                                        CHALLENGE + REFACTOR pass on the solo build; then `round` again (solo + challenger)
 //   node bench.mjs report <id> <n>     → writes shreds/<n>/bench.md: twins vs solo (vs solo + challenger)
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PROJECTS, reconcile, tokens } from './costs.mjs';
@@ -176,21 +176,24 @@ export function render(n, sides, incomplete) {
 export function benchReport(repo, id, n, projects = PROJECTS) {
   const { state, shred, bench } = benchOf(repo, id, n, 'validating', 'duo-validating', 'done');
   const twinRounds = Array.from({ length: shred.round }, (_, i) => roundFindings(repo, id, n, `r${i + 1}`));
+  const solo = roundFindings(repo, id, n, SOLO);
   const runs = reconcile(allRuns(repo), projects);
   const dir = shredDir(repo, id, n);
   const profile = readProfile(profilePath(repo));
   const { reqs } = planShred(repo, id, n);
   const tests = (label) => testsPerReq(readFileSync(join(dir, `diff-${label}.patch`), 'utf8'), profile, reqs);
-  const between = (from, to) => (r) => r.started >= from && (!to || r.started <= to);
+  const between = (from, to) => (r) => r.started >= from && r.started <= to;
+  // A side ends when its last findings file was written: later runs belong to later work.
+  const graded = (label) => new Date(Math.max(...validatorsFor(repo, id, n).roles.map((role) => statSync(findingsPath(repo, id, n, label, role)).mtimeMs))).toISOString();
 
   // ponytail: runs attributed by start time; anything else spawned during the shred or the bench is counted too.
   const sides = [
     ['Twins', side(runs.filter(between(shred.opened, shred.landedAt ?? bench.opened)), twinRounds, tests(`r${shred.round}`))],
-    ['Solo', side(runs.filter(between(bench.opened, bench.challenged)), [roundFindings(repo, id, n, SOLO)], tests(SOLO))],
+    ['Solo', side(runs.filter(between(bench.opened, bench.challenged ?? graded(SOLO))), [solo], tests(SOLO))],
   ];
   if (existsSync(join(dir, `diff-${DUO}.patch`))) {
-    const build = (r) => r.role === Role.Solo && r.started >= bench.opened;
-    sides.push(['Solo + challenger', side(runs.filter((r) => build(r) || between(bench.challenged)(r)), [roundFindings(repo, id, n, DUO)], tests(DUO))]);
+    const build = (r) => r.role === Role.Solo && between(bench.opened, bench.challenged)(r);
+    sides.push(['Solo + challenger', side(runs.filter((r) => build(r) || between(bench.challenged, graded(DUO))(r)), [roundFindings(repo, id, n, DUO)], tests(DUO))]);
   }
   const file = join(dir, 'bench.md');
   const stopped = shred.status === 'landed' ? '' : `\nTwins did not land: shred stopped at ${shred.status}, round ${shred.round}.\n`;

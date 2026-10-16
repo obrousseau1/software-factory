@@ -110,7 +110,7 @@ test('report: twins vs solo by time window, blocking, tests per requirement, cos
     run('a1', 'twin', 'claude-sonnet-5-5', opened, 1e6),
     run('a2', 'spec-validator', 'claude-sonnet-5-5', landedAt, 1e6),
     run('a3', 'solo', 'claude-sonnet-5-5', bench.opened, 1e6),
-    run('a4', 'spec-validator', 'mystery', new Date().toISOString(), 1e6),
+    run('a4', 'spec-validator', 'mystery', bench.opened, 1e6),
   ]));
 
   const { file, sides: { Twins: twins, Solo: solo } } = benchReport(repo, ID, 1, NO_PROJECTS);
@@ -161,4 +161,17 @@ test('challenge: challenger spawns and stops under the same bar; report adds a s
   const { file, sides } = benchReport(repo, ID, 1, NO_PROJECTS);
   assert.deepEqual([sides.Solo.tests['R-02'], sides['Solo + challenger'].tests['R-02']], [1, 2]);
   assert.match(readFileSync(file, 'utf8'), /\| Metric \| Twins \| Solo \| Solo \+ challenger \|/);
+});
+
+test('report: runs after the last findings file belong to later work, not to the bench', () => {
+  const repo = landed();
+  openBench(repo, ID, 1);
+  benchRound(repo, ID, 1);
+  findings(repo, 'solo');
+  const { bench } = shred(repo);
+  write(repo, `.liftoff/wo/${ID}/ledger.md`, render([
+    run('s1', 'solo', 'claude-sonnet-5-5', bench.opened, 1),
+    run('t9', 'twin', 'claude-sonnet-5-5', '2999-01-01T00:00:00Z', 1),
+  ]));
+  assert.equal(benchReport(repo, ID, 1, NO_PROJECTS).sides.Solo.runs, 1);
 });
