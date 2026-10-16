@@ -30,26 +30,26 @@ test('builder spawns only while a shred is in work', () => {
   assert.equal(spawn(repo, 'builder'), null);
 });
 
-test('escalated shred: builder and validators denied (no extra round)', () => {
+test('escalated shred: builder and reviewers denied (no extra round)', () => {
   const repo = makeRepo();
   openShred(repo, ID, 1);
   withStatus(repo, 'escalated');
   assert.ok(isDenied(spawn(repo, 'spaceport:builder')));
-  assert.ok(isDenied(spawn(repo, 'spaceport:spec-validator')));
+  assert.ok(isDenied(spawn(repo, 'spaceport:reviewer')));
 });
 
-test('validators spawn only while a shred is validating', () => {
+test('reviewers spawn only while a shred is reviewing', () => {
   const repo = makeRepo();
   openShred(repo, ID, 1);
-  assert.ok(isDenied(spawn(repo, 'spaceport:security-validator')));
-  withStatus(repo, 'validating');
-  assert.equal(spawn(repo, 'spaceport:security-validator'), null);
+  assert.ok(isDenied(spawn(repo, 'spaceport:security-reviewer')));
+  withStatus(repo, 'reviewing');
+  assert.equal(spawn(repo, 'spaceport:security-reviewer'), null);
 });
 
 test('no work order in the repo: not a factory run, spawns pass', () => {
   const repo = makeRepo();
   rmSync(join(repo, '.liftoff', 'wo'), { recursive: true });
-  assert.equal(spawn(repo, 'spaceport:spec-validator'), null);
+  assert.equal(spawn(repo, 'spaceport:reviewer'), null);
 });
 
 test('cli denies on malformed input (fails closed)', () => {

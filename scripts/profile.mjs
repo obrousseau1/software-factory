@@ -33,9 +33,17 @@ export function gateCommands(meta) {
     .filter(([, command]) => command && command !== NONE));
 }
 
+const matchesAny = (globs, rel) => globs.split(',').some((glob) => matchesGlob(rel, glob.trim()));
+
 // Repo-relative path, `/` separators.
 export function isTest(meta, rel) {
-  return meta['test-globs'].split(',').some((glob) => matchesGlob(rel, glob.trim()));
+  return matchesAny(meta['test-globs'], rel);
+}
+
+// Optional key `sensitive-globs` (auth, input parsing, secrets, I/O): missing → every path is sensitive, `none` → none.
+export function isSensitive(meta, rel) {
+  const globs = meta['sensitive-globs'];
+  return !globs || (globs !== NONE && matchesAny(globs, rel));
 }
 
 function main([command, file = profilePath(process.cwd())]) {

@@ -43,8 +43,8 @@ export function usage(jsonl) {
   };
 }
 
-// A shred being built or validated: its runs belong to its work order.
-const inProgress = (shred) => ['work', 'validating'].includes(shred.status);
+// A shred being built or reviewed: its runs belong to its work order.
+const inProgress = (shred) => ['work', 'reviewing'].includes(shred.status);
 
 // Work order with a shred in progress, else the latest not yet approved at final; or null.
 export function currentWorkOrder(repo) {

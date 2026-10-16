@@ -1,14 +1,16 @@
 # Review
 
-Validators check a built shred in parallel; `validate.mjs` reads their findings and decides. Max 3
-rounds; a hook denies builder and validator spawns once a shred is escalated.
+The reviewer checks a built shred; the security reviewer joins when the diff touches a sensitive
+path. `review.mjs` reads their findings and decides. Max 2 rounds; a hook denies builder and
+reviewer spawns once a shred is escalated.
 
 1. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/state.mjs" step <id> review`.
-2. **Round**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/validate.mjs" round <id> <n>`. A `warnings` entry
+2. **Round**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/review.mjs" round <id> <n>`. A `warnings` entry
    → mention it with ⚠️ in your next reply.
-3. Spawn every printed `agent` with its `prompt`, verbatim, **in one message** (parallel).
-4. **Verdict**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/validate.mjs" verdict <id> <n>`.
-   - `Re-spawn these validators` → re-spawn only those, once, same prompt. Fails again → reply ⛔
+3. Spawn every printed `agent` with its `prompt`, verbatim, **in one message** (parallel). Round 2:
+   append `Builder replies:` and the builder's `Findings:` line.
+4. **Verdict**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/review.mjs" verdict <id> <n>`.
+   - `Re-spawn these reviewers` → re-spawn only those, once, same prompt. Fails again → reply ⛔
      and ask with `AskUserQuestion`: retry, or stop.
    - `pass: true` → the shred landed on `spaceport/<id>`. More shreds in `plan.md` → `state.mjs step
      <id> work`, work step 2. None left → final step.
@@ -22,5 +24,5 @@ rounds; a hook denies builder and validator spawns once a shred is escalated.
    - **Amend spec**: `node "${CLAUDE_PLUGIN_ROOT}/scripts/shred.mjs" drop <id> <n>`, then
      `spaceport:amend-doc` on `spec.md` with the user's change; it sends you back to the docs gate.
 
-Never edit findings, never skip a validator, never decide a finding yourself: the builder fixes or
+Never edit findings, never skip a reviewer, never decide a finding yourself: the builder fixes or
 rejects it in the fix round.

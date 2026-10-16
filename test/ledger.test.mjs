@@ -42,7 +42,7 @@ test('usage keeps the last entry per message and times first to last entry', () 
 test('one row per agent, rewritten on a later stop; totals per role', () => {
   const repo = makeRepo();
   stop(repo, 'a1');
-  stop(repo, 'a2', 'spaceport:spec-validator');
+  stop(repo, 'a2', 'spaceport:reviewer');
   stop(repo, 'a1', 'spaceport:builder', [TRANSCRIPT, entry('m3', '40', 5)].join('\n'));
   const md = readFileSync(ledger(repo), 'utf8');
   assert.equal(md.match(/^\| a1 \|/gm).length, 1);
@@ -63,7 +63,7 @@ test('logs to the work order whose shred is in progress, even when a later one i
   const repo = makeRepo();
   write(repo, '.liftoff/wo/009-later/state.json', JSON.stringify({ id: '009-later', step: 'intent' }));
   assert.equal(currentWorkOrder(repo), '009-later');
-  for (const shred of [{ n: 1, status: 'work' }, { n: 1, status: 'validating' }]) {
+  for (const shred of [{ n: 1, status: 'work' }, { n: 1, status: 'reviewing' }]) {
     write(repo, `.liftoff/wo/${ID}/state.json`, JSON.stringify({ id: ID, shreds: [shred] }));
     assert.equal(currentWorkOrder(repo), ID);
   }

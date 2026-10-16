@@ -43,7 +43,7 @@ test('open creates a sibling worktree; one shred at a time', () => {
 
 test('open prints the builder prompt, with only builder lessons', () => {
   const repo = makeRepo();
-  write(repo, '.liftoff/lessons.md', '# Lessons\n- [builder] Put tests next to the code.\n- [spec-validator] Check R-xx clauses.\n');
+  write(repo, '.liftoff/lessons.md', '# Lessons\n- [builder] Put tests next to the code.\n- [reviewer] Check R-xx clauses.\n');
   const { agent, prompt } = openShred(repo, ID, 1);
   assert.equal(agent, 'spaceport:builder');
   assert.match(prompt, /Shred 1: build R-01, R-02\./);
