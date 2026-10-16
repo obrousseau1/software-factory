@@ -1,4 +1,4 @@
-// `.liftoff/lessons.md` (postmortem skill): one lesson per line, tagged with the role it is for: `- [twin] …`.
+// `.liftoff/lessons.md` (postmortem skill): one lesson per line, tagged with the role it is for: `- [builder] …`.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

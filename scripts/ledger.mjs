@@ -1,5 +1,5 @@
 // SubagentStop hook (every agent): sums a subagent's real token usage and elapsed time from its transcript into the
-// current work order's ledger.md, one row per agent id (a blocked twin stops more than once), with per-role totals.
+// current work order's ledger.md, one row per agent id (a blocked or resumed builder stops more than once), with per-role totals.
 // Fails open: logging must never trap an agent.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -43,10 +43,10 @@ export function usage(jsonl) {
   };
 }
 
-// A shred being built or validated, or a benchmark not done: its runs belong to its work order.
-const inProgress = (shred) => ['work', 'validating'].includes(shred.status) || (shred.bench && shred.bench.status !== 'done');
+// A shred being built or validated: its runs belong to its work order.
+const inProgress = (shred) => ['work', 'validating'].includes(shred.status);
 
-// Work order with a shred or benchmark in progress, else the latest not yet approved at final; or null.
+// Work order with a shred in progress, else the latest not yet approved at final; or null.
 export function currentWorkOrder(repo) {
   const root = woRoot(repo);
   if (!existsSync(root)) return null;

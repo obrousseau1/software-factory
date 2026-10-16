@@ -2,11 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { frontmatter } from '../scripts/frontmatter.mjs';
-import { checkTurn, dropShred, git, handoffPath, nextTurn, openShred, shredDir } from '../scripts/shred.mjs';
+import { checkBuild, dropShred, git, markBuilt, openShred, shredDir } from '../scripts/shred.mjs';
 import { MAX_ROUNDS, startRound, summary, verdict } from '../scripts/validate.mjs';
 import { getWorkOrder } from '../scripts/state.mjs';
-import { ID, SEED_TEST, TEST_FILE, built, makeRepo, setPhase, write } from './shred-repo.mjs';
+import { ID, SEED_TEST, TEST_FILE, built, makeRepo, write } from './shred-repo.mjs';
 
 const CLEAN = '| # | Severity | Where | Finding |\n|---|----------|-------|---------|\n';
 const VALIDATORS = ['spec-validator', 'security-validator', 'standards-validator'];
@@ -20,15 +19,12 @@ const findings = (repo, round, rows = {}) => {
 const shred = (repo) => getWorkOrder(repo, ID).shreds[0];
 const MAJOR = { 'spec-validator': '| 1 | Major | src/calc.js:1 | R-02 subtract missing |\n' };
 
-// Fails a round, then completes the fix turn so the shred is built again.
+// Fails a round, then the builder's fix round leaves the shred built again.
 function failAndFix(repo, round) {
   startRound(repo, ID, 1);
   findings(repo, round, MAJOR);
   verdict(repo, ID, 1);
-  nextTurn(repo, ID, 1);
-  const file = handoffPath(repo, ID, 1);
-  write(shredDir(repo, ID, 1), 'handoff.md', readFileSync(file, 'utf8').replace(/\| open \|/g, '| rejected: out of scope |'));
-  assert.deepEqual(nextTurn(repo, ID, 1), { done: true });
+  assert.deepEqual(markBuilt(repo, ID, 1), { built: 1 });
 }
 
 test('round writes the diff and prompts each validator; ux skipped at none', () => {
@@ -43,7 +39,7 @@ test('round writes the diff and prompts each validator; ux skipped at none', () 
 
 test('each validator prompt carries only its own lessons', () => {
   const { repo } = built();
-  write(repo, '.liftoff/lessons.md', '# Lessons\n- [twin] Put tests next to the code.\n- [spec-validator] Check R-xx clauses.\n');
+  write(repo, '.liftoff/lessons.md', '# Lessons\n- [builder] Put tests next to the code.\n- [spec-validator] Check R-xx clauses.\n');
   const [spec, security] = startRound(repo, ID, 1).validators;
   assert.match(spec.prompt, /Lessons from earlier work orders: Check R-xx clauses\.$/);
   assert.doesNotMatch(security.prompt, /Lessons/);
@@ -75,21 +71,16 @@ test('clean round lands the shred on the work-order branch', () => {
   assert.deepEqual(summary(repo, ID).shreds[0].minor.map((m) => m.where), ['src/calc.js:1']);
 });
 
-test('blocking finding → open F doubt, fix turn by the other twin, blocked until resolved', () => {
+test('blocking finding → back to work with a fix message for the builder, then round 2', () => {
   const { repo } = built();
   startRound(repo, ID, 1);
   findings(repo, 1, MAJOR);
-  assert.deepEqual(verdict(repo, ID, 1), { pass: false, round: 1, escalated: false, blocking: 1 });
+  const result = verdict(repo, ID, 1);
+  assert.deepEqual([result.pass, result.round, result.escalated, result.blocking], [false, 1, false, 1]);
+  assert.equal(result.fix.split('\n')[1], 'F1-1 [Major] spec-validator: src/calc.js:1: R-02 subtract missing');
+  assert.deepEqual([shred(repo).status, shred(repo).blocks], ['work', 0]);
 
-  const turn = nextTurn(repo, ID, 1);
-  assert.deepEqual([turn.turn, turn.twin, turn.phases, turn.final], [3, 'B', ['CHALLENGE'], true]);
-  assert.match(turn.prompt, /Phases: CHALLENGE findings r1\./);
-  assert.equal(frontmatter(readFileSync(handoffPath(repo, ID, 1), 'utf8')).challenge, 'findings r1');
-  assert.ok(checkTurn(repo, ID, 1).some((e) => /doubt F1-1/.test(e)));
-
-  const file = handoffPath(repo, ID, 1);
-  write(shredDir(repo, ID, 1), 'handoff.md', readFileSync(file, 'utf8').replace('| open |', '| fixed: added subtract |'));
-  assert.deepEqual(nextTurn(repo, ID, 1), { done: true });
+  assert.deepEqual(markBuilt(repo, ID, 1), { built: 1 });
   assert.equal(startRound(repo, ID, 1).round, 2);
 });
 
@@ -102,7 +93,7 @@ test(`round ${MAX_ROUNDS} failing escalates; no further round`, () => {
   assert.equal(verdict(repo, ID, 1).escalated, true);
   assert.equal(shred(repo).status, 'escalated');
   assert.throws(() => startRound(repo, ID, 1), /is escalated, not built/);
-  assert.throws(() => nextTurn(repo, ID, 1), /is escalated/);
+  assert.deepEqual(checkBuild(repo, ID, 1), ['Shred 1 is escalated: no build to check.']);
 });
 
 test('drop removes an escalated shred so it can be opened again', () => {
@@ -120,22 +111,18 @@ test('a shred not landed blocks opening another', () => {
 
 const LICENSE = '| 1 | Major | tests/calc.test.js:1 | seed test duplicates R-01 |\n\n## Remove\n\n### 1 tests/calc.test.js\n```js\nseed test line\n```\n';
 
-test('Remove block licenses the fix turn to delete exactly those test lines', () => {
+test('Remove block licenses the fix round to delete exactly those test lines', () => {
   const { repo, worktree } = built();
   startRound(repo, ID, 1);
   findings(repo, 1, { 'standards-validator': LICENSE });
-  verdict(repo, ID, 1);
+  assert.match(verdict(repo, ID, 1).fix, /F1-1 .*\(removal licensed\)$/m);
   assert.deepEqual(shred(repo).licenses, { [TEST_FILE]: [SEED_TEST] });
-  assert.match(readFileSync(handoffPath(repo, ID, 1), 'utf8'), /F1-1 .*\(removal licensed\) \| open/);
 
-  nextTurn(repo, ID, 1);
-  const file = handoffPath(repo, ID, 1);
-  write(shredDir(repo, ID, 1), 'handoff.md', readFileSync(file, 'utf8').replace('| open |', '| fixed: removed |'));
   write(worktree, TEST_FILE, 'R-02 subtracts\n');
-  assert.ok(checkTurn(repo, ID, 1).some((e) => /removed test lines.*R-01 adds/.test(e)), 'unlicensed line flagged');
+  assert.ok(checkBuild(repo, ID, 1).some((e) => /removed committed test lines.*R-01 adds/.test(e)), 'unlicensed line flagged');
   write(worktree, TEST_FILE, 'R-01 adds\nR-02 subtracts\n');
-  assert.deepEqual(checkTurn(repo, ID, 1), []);
-  assert.deepEqual(nextTurn(repo, ID, 1), { done: true });
+  assert.deepEqual(checkBuild(repo, ID, 1), []);
+  assert.deepEqual(markBuilt(repo, ID, 1), { built: 1 });
   assert.equal(shred(repo).licenses, undefined);
 });
 

@@ -1,7 +1,7 @@
 // Validation rounds of a built shred (design §5). Usage:
 //   node validate.mjs round <id> <n>    → starts the next round (max MAX_ROUNDS), writes the diff, prints validator prompts
 //   node validate.mjs verdict <id> <n>  → reads the round's findings: pass → the shred lands on spaceport/<id>;
-//                                         Critical / Major → F doubts in handoff.md and a fix turn; round 3 → escalated
+//                                         Critical / Major → back to work, with the fix message for the builder; round 3 → escalated
 //   node validate.mjs summary <id>      → shreds, rounds and Minor findings, for the final step
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { section, shreds } from './docs.mjs';
 import { lessonsNote } from './lessons.mjs';
 import { PLUGIN, Role, VALIDATORS } from './roles.mjs';
-import { git, handoffPath, mainRepo, saveShred, shredDir, woBranch } from './shred.mjs';
+import { git, mainRepo, saveShred, shredDir, woBranch } from './shred.mjs';
 import { getWorkOrder, woRoot } from './state.mjs';
 
 export const MAX_ROUNDS = 3;
@@ -17,7 +17,7 @@ export const SEVERITIES = ['Critical', 'Major', 'Minor'];
 export const BLOCKING = ['Critical', 'Major'];
 const HEADER = /^\|\s*#\s*\|\s*Severity\s*\|\s*Where\s*\|\s*Finding\s*\|/m;
 
-// `label`: `r<k>` for round k, `solo` for the benchmark (bench.mjs).
+// `label`: `r<k>` for round k.
 export const findingsPath = (repo, id, n, label, role) => join(shredDir(repo, id, n), 'findings', `${label}-${role}.md`);
 
 function shredOf(state, n, status) {
@@ -52,7 +52,7 @@ export function startRound(repo, id, n) {
   const validators = roles.map((role) => ({
     agent: `${PLUGIN}:${role}`,
     prompt: `Work order: ${id}. Shred ${n}, round ${round}. Repo: ${repo}. Worktree: ${shred.worktree}. Diff: ${diff}. `
-      + `Handoff: ${handoffPath(repo, id, n)}. Findings file: ${findingsPath(repo, id, n, `r${round}`, role)}.`
+      + `Findings file: ${findingsPath(repo, id, n, `r${round}`, role)}.`
       + (role === Role.UxValidator ? ` UX level: ${level}.` : '') + earlier + lessonsNote(repo, role),
   }));
   return { round, validators, warnings: ux === 'deep' ? ['UX deep runs as simple (Playwright not built yet).'] : [] };
@@ -83,18 +83,18 @@ export function parseFindings(file) {
     });
 }
 
-// Test lines the blocking findings license the fix turn to delete: { <path>: [lines] }.
+// Test lines the blocking findings license the fix round to delete: { <path>: [lines] }.
 function licenses(blocking) {
   const byPath = {};
   for (const { path, lines } of blocking.flatMap((f) => f.remove)) byPath[path] = [...(byPath[path] ?? []), ...lines];
   return byPath;
 }
 
-// Blocking findings become open F doubts the fix turn must resolve.
-function addDoubts(file, round, blocking) {
+// The message liftoff sends the builder: each blocking finding, numbered F<round>-<i>, to fix or reject.
+export function fixMessage(round, blocking) {
   const licensed = (f) => f.remove.length ? ' (removal licensed)' : '';
-  const rows = blocking.map((f, i) => `| F${round}-${i + 1} | [${f.severity}] ${f.role}: ${f.where}: ${f.finding.replaceAll('|', '/')}${licensed(f)} | open |`);
-  writeFileSync(file, `${readFileSync(file, 'utf8').trimEnd()}\n${rows.join('\n')}\n`);
+  const rows = blocking.map((f, i) => `F${round}-${i + 1} [${f.severity}] ${f.role}: ${f.where}: ${f.finding}${licensed(f)}`);
+  return [`Review round ${round} found blocking issues. Fix or reject each, run the gates, then report:`, ...rows].join('\n');
 }
 
 // Every validator's findings of the round, tagged with its role; throws naming each missing / malformed file.
@@ -135,9 +135,8 @@ export function verdict(repo, id, n) {
     saveShred(repo, state, { ...shred, status: 'escalated', minor });
     return { pass: false, round, escalated: true, blocking };
   }
-  addDoubts(handoffPath(repo, id, n), round, blocking);
-  saveShred(repo, state, { ...shred, status: 'work', fix: round, minor, licenses: licenses(blocking) });
-  return { pass: false, round, escalated: false, blocking: blocking.length };
+  saveShred(repo, state, { ...shred, status: 'work', blocks: 0, minor, licenses: licenses(blocking) });
+  return { pass: false, round, escalated: false, blocking: blocking.length, fix: fixMessage(round, blocking) };
 }
 
 export function summary(repo, id) {

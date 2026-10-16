@@ -2,31 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { frontmatter } from '../scripts/frontmatter.mjs';
-import { checkTurn, handoffPath, nextTurn, openShred, removedLines, shredDir, turnPlan } from '../scripts/shred.mjs';
+import { checkBuild, git, markBuilt, openShred, removedLines, runGates } from '../scripts/shred.mjs';
 import { getWorkOrder } from '../scripts/state.mjs';
-import { ID, SEED_TEST, TEST_FILE, addDoubt, makeRepo, setPhase, write } from './shred-repo.mjs';
+import { ID, SEED_TEST, TEST_FILE, buildAll, makeRepo, write } from './shred-repo.mjs';
 
-// Opens shred 1 and starts turn 0; returns the worktree.
-function started(options) {
+function opened(options) {
   const repo = makeRepo(options);
   const { worktree } = openShred(repo, ID, 1);
-  nextTurn(repo, ID, 1);
   return { repo, worktree };
 }
 
-// Completes turn 0 (BUILD R-01) the way a twin would.
-function buildR01(repo, worktree) {
-  write(worktree, TEST_FILE, `${SEED_TEST}\nR-01 adds\n`);
-  write(worktree, 'src/calc.js', 'export const add = (a, b) => a + b; // R-01\n');
-}
-
-test('turnPlan rotates BUILD, then CHALLENGE + REFACTOR + BUILD, then a final challenge', () => {
-  const reqs = ['R-01', 'R-02'];
-  assert.deepEqual(turnPlan(reqs, 0), { twin: 'A', phases: ['BUILD'], challenge: null, build: 'R-01', final: false });
-  assert.deepEqual(turnPlan(reqs, 1), { twin: 'B', phases: ['CHALLENGE', 'REFACTOR', 'BUILD'], challenge: 'R-01', build: 'R-02', final: false });
-  assert.deepEqual(turnPlan(reqs, 2), { twin: 'A', phases: ['CHALLENGE', 'REFACTOR'], challenge: 'R-02', build: null, final: true });
-});
+const gateRuns = (worktree) => readFileSync(join(worktree, 'gate-runs'), 'utf8').length;
 
 test('removedLines ignores indentation, counts duplicates', () => {
   assert.deepEqual(removedLines('a\n  b\n', '  a\nb\nc'), []);
@@ -55,102 +41,80 @@ test('open creates a sibling worktree; one shred at a time', () => {
   assert.throws(() => openShred(repo, ID, 1), /already open/);
 });
 
-test('twin prompt carries only twin lessons', () => {
+test('open prints the builder prompt, with only builder lessons', () => {
   const repo = makeRepo();
-  write(repo, '.liftoff/lessons.md', '# Lessons\n- [twin] Put tests next to the code.\n- [spec-validator] Check R-xx clauses.\n');
-  openShred(repo, ID, 1);
-  const { prompt } = nextTurn(repo, ID, 1);
+  write(repo, '.liftoff/lessons.md', '# Lessons\n- [builder] Put tests next to the code.\n- [spec-validator] Check R-xx clauses.\n');
+  const { agent, prompt } = openShred(repo, ID, 1);
+  assert.equal(agent, 'spaceport:builder');
+  assert.match(prompt, /Shred 1: build R-01, R-02\./);
   assert.match(prompt, /Lessons from earlier work orders: Put tests next to the code\.$/);
   assert.doesNotMatch(prompt, /R-xx clauses/);
+  assert.equal(getWorkOrder(repo, ID).shreds[0].prompt, undefined);
 });
 
-test('turn 0 writes the handoff and prints the twin prompt', () => {
-  const repo = makeRepo();
-  openShred(repo, ID, 1);
-  const turn = nextTurn(repo, ID, 1);
-  assert.match(turn.prompt, /Shred 1, turn 0, twin A\. Phases: BUILD R-01\./);
-  const meta = frontmatter(readFileSync(handoffPath(repo, ID, 1), 'utf8'));
-  assert.deepEqual([meta.turn, meta.phase, meta.build, meta.challenge], ['0', 'BUILD', 'R-01', 'none']);
-});
-
-test('a complete turn is committed, archived, and the next one starts', () => {
-  const { repo, worktree } = started();
-  buildR01(repo, worktree);
-  assert.deepEqual(checkTurn(repo, ID, 1), []);
-  const turn = nextTurn(repo, ID, 1);
-  assert.match(turn.prompt, /twin B\. Phases: CHALLENGE R-01 → REFACTOR R-01 → BUILD R-02\./);
-  assert.ok(existsSync(join(shredDir(repo, ID, 1), 'turns', '0.md')));
-  assert.equal(frontmatter(readFileSync(handoffPath(repo, ID, 1), 'utf8')).phase, 'CHALLENGE');
-});
-
-test('turn refuses to advance while the turn is incomplete', () => {
-  const { repo } = started();
-  write(repo, '../repo.spaceport/001-calc-1/RED', '');
-  assert.throws(() => nextTurn(repo, ID, 1), /Turn 0 is not complete: gate test red/);
-});
-
-test('removing a test line from an earlier turn is flagged', () => {
-  const { repo, worktree } = started();
-  buildR01(repo, worktree);
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'BUILD');
-  write(worktree, TEST_FILE, 'R-02 only\n');
-  assert.ok(checkTurn(repo, ID, 1).some((e) => /removed test lines.*seed test line/.test(e)));
-});
-
-test('deleting a test file is flagged', () => {
-  const { repo, worktree } = started();
-  rmSync(join(worktree, TEST_FILE));
-  assert.ok(checkTurn(repo, ID, 1).some((e) => /calc\.test\.js: removed test lines/.test(e)));
-});
-
-test('phase must end at the last phase of the turn', () => {
-  const { repo, worktree } = started();
-  buildR01(repo, worktree);
-  nextTurn(repo, ID, 1);
-  assert.ok(checkTurn(repo, ID, 1).includes('handoff.md: finish every phase; phase must end at BUILD'));
-});
-
-test('an open doubt received must be resolved', () => {
-  const { repo, worktree } = started();
-  buildR01(repo, worktree);
-  addDoubt(repo, '| D-1 | Negative numbers? | open |');
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'BUILD');
-  assert.ok(checkTurn(repo, ID, 1).some((e) => /doubt D-1/.test(e)));
-  write(repo, '.liftoff/wo/001-calc/shreds/1/handoff.md',
-    readFileSync(handoffPath(repo, ID, 1), 'utf8').replace('| open |', '| rejected: out of scope |'));
-  assert.ok(!checkTurn(repo, ID, 1).some((e) => /doubt/.test(e)));
-});
-
-test('writes outside the worktree are flagged', () => {
-  const { repo, worktree } = started();
-  buildR01(repo, worktree);
-  write(repo, 'src/stray.js', 'x');
-  assert.ok(checkTurn(repo, ID, 1).some((e) => /changed outside the worktree.*src\/stray\.js/.test(e)));
-});
-
-test('final turn needs every requirement tested and no TODO', () => {
-  const { repo, worktree } = started();
-  buildR01(repo, worktree);
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'BUILD');
+test('an incomplete build: every requirement tested, no TODO', () => {
+  const { repo, worktree } = opened();
+  write(worktree, TEST_FILE, `${SEED_TEST}\nR-01 adds\n`);
   write(worktree, 'src/calc.js', 'export const add = (a, b) => a + b; // TODO R-02\n');
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'REFACTOR');
-  const errors = checkTurn(repo, ID, 1);
+  const errors = checkBuild(repo, ID, 1);
   assert.ok(errors.includes('R-02: no changed test references it'), errors.join('\n'));
   assert.ok(errors.includes('src/calc.js: TODO / NotImplemented left in the diff'), errors.join('\n'));
 });
 
-test('final turn complete → shred built', () => {
-  const { repo, worktree } = started();
-  buildR01(repo, worktree);
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'BUILD');
-  write(worktree, TEST_FILE, `${SEED_TEST}\nR-01 adds\nR-02 subtracts\n`);
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'REFACTOR');
-  assert.deepEqual(nextTurn(repo, ID, 1), { done: true });
+test('removing a committed test line is flagged; deleting the file too', () => {
+  const { repo, worktree } = opened();
+  write(worktree, TEST_FILE, 'R-01 adds\nR-02 subtracts\n');
+  assert.ok(checkBuild(repo, ID, 1).some((e) => /removed committed test lines.*seed test line/.test(e)));
+  rmSync(join(worktree, TEST_FILE));
+  assert.ok(checkBuild(repo, ID, 1).some((e) => /calc\.test\.js: removed committed test lines/.test(e)));
+});
+
+test('writes outside the worktree are flagged', () => {
+  const { repo, worktree } = opened();
+  buildAll(worktree);
+  write(repo, 'src/stray.js', 'x');
+  assert.ok(checkBuild(repo, ID, 1).some((e) => /changed outside the worktree.*src\/stray\.js/.test(e)));
+});
+
+test('built refuses an incomplete build', () => {
+  const { repo, worktree } = opened();
+  buildAll(worktree);
+  write(worktree, 'RED', '');
+  assert.throws(() => markBuilt(repo, ID, 1), /Shred 1 is not complete: gate test red/);
+  assert.equal(getWorkOrder(repo, ID).shreds[0].status, 'work');
+});
+
+test('a complete build is committed and the shred built', () => {
+  const { repo, worktree } = opened();
+  buildAll(worktree);
+  assert.deepEqual(checkBuild(repo, ID, 1), []);
+  assert.deepEqual(markBuilt(repo, ID, 1), { built: 1 });
   assert.equal(getWorkOrder(repo, ID).shreds[0].status, 'built');
+  assert.match(git(worktree, 'log', '-1', '--format=%s'), /shred 1 build 1/);
+  assert.equal(git(worktree, 'status', '--porcelain'), '');
+  assert.deepEqual(checkBuild(repo, ID, 1), ['Shred 1 is built: no build to check.']);
+});
+
+test('gates of an unchanged tree are served from cache; any change runs them again', () => {
+  const { repo, worktree } = opened();
+  const base = gateRuns(worktree);
+  assert.deepEqual(runGates(repo, worktree), []);
+  assert.equal(gateRuns(worktree), base, 'open already ran them on this tree');
+  write(worktree, 'src/calc.js', 'changed\n');
+  runGates(repo, worktree);
+  runGates(repo, worktree);
+  assert.equal(gateRuns(worktree), base + 1);
+  write(worktree, 'src/new.js', 'untracked\n');
+  runGates(repo, worktree);
+  assert.equal(gateRuns(worktree), base + 2);
+  assert.equal(git(worktree, 'status', '--porcelain', '--', 'src/new.js').trim(), '?? src/new.js', 'index untouched');
+});
+
+test('a red gate is not cached', () => {
+  const { repo, worktree } = opened();
+  write(worktree, 'RED', '');
+  const base = gateRuns(worktree);
+  assert.match(runGates(repo, worktree)[0], /gate test red/);
+  runGates(repo, worktree);
+  assert.equal(gateRuns(worktree), base + 2);
 });

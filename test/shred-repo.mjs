@@ -1,9 +1,8 @@
 // Fixture for shred tests: a git repo with a profile, an approved work order at `work` and a 2-requirement shred.
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import assert from 'node:assert/strict';
-import { git, handoffPath, nextTurn, openShred } from '../scripts/shred.mjs';
+import { git, markBuilt, openShred } from '../scripts/shred.mjs';
 
 export const ID = '001-calc';
 export const TEST_FILE = 'tests/calc.test.js';
@@ -15,7 +14,7 @@ setup: node -e "process.exit(require('fs').existsSync('NOSETUP') ? 1 : 0)"
 gate-format: none
 gate-lint: none
 gate-typecheck: none
-gate-build: node -e "process.exit(0)"
+gate-build: node -e "require('fs').appendFileSync('gate-runs', 'x')"
 gate-test: node -e "process.exit(require('fs').existsSync('RED') ? 1 : 0)"
 run: none
 req-tag: comment R-01
@@ -50,33 +49,23 @@ export function makeRepo({ red = false, broken = false } = {}) {
   git(repo, 'config', 'user.email', 'test@example.com');
   git(repo, 'config', 'user.name', 'test');
   git(repo, 'config', 'commit.gpgsign', 'false');
-  write(repo, '.gitignore', '.liftoff/\n');
+  write(repo, '.gitignore', '.liftoff/\ngate-runs\n');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'base');
   return repo;
 }
 
-export function setPhase(repo, phase, n = 1) {
-  const file = handoffPath(repo, ID, n);
-  writeFileSync(file, readFileSync(file, 'utf8').replace(/^phase: .*$/m, `phase: ${phase}`));
-}
+// Writes what a builder would for both requirements.
+export const buildAll = (worktree) => {
+  write(worktree, TEST_FILE, `${SEED_TEST}\nR-01 adds\nR-02 subtracts\n`);
+  write(worktree, 'src/calc.js', 'export const add = (a, b) => a + b; // R-01\n');
+};
 
-export function addDoubt(repo, row, n = 1) {
-  const file = handoffPath(repo, ID, n);
-  writeFileSync(file, `${readFileSync(file, 'utf8').trimEnd()}\n${row}\n`);
-}
-
-// Shred 1 built by three twin turns; returns { repo, worktree }.
+// Shred 1 built and committed; returns { repo, worktree }.
 export function built() {
   const repo = makeRepo();
   const { worktree } = openShred(repo, ID, 1);
-  nextTurn(repo, ID, 1);
-  write(worktree, TEST_FILE, `${SEED_TEST}\nR-01 adds\nR-02 subtracts\n`);
-  write(worktree, 'src/calc.js', 'export const add = (a, b) => a + b; // R-01\n');
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'BUILD');
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'REFACTOR');
-  assert.deepEqual(nextTurn(repo, ID, 1), { done: true });
+  buildAll(worktree);
+  markBuilt(repo, ID, 1);
   return { repo, worktree };
 }

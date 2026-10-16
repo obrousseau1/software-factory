@@ -43,7 +43,7 @@ Read a step file only when entering that step. Never preload them.
 | Intent | [steps/intent.md](steps/intent.md) | ✋ interactive |
 | Docs | [steps/docs.md](steps/docs.md) | ✋ approve spec + plan |
 | Work | [steps/work.md](steps/work.md) | ✋ on escalation |
-| Validate | [steps/validate.md](steps/validate.md) | ✋ after 3 failed rounds |
+| Review | [steps/review.md](steps/review.md) | ✋ after 3 failed rounds |
 | Final | [steps/final.md](steps/final.md) | ✋ approve |
 
 A step file marked **not built yet** means: stop, reply ⚠️ naming the step and its milestone.
