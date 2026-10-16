@@ -68,6 +68,7 @@ Liftoff is the **main session**, not a subagent. Everything else is a subagent s
 | **security-validator** | Vulnerabilities, secrets, unsafe patterns in the diff | nothing | opus |
 | **standards-validator** | Coding standards, design, naming, per `profile.md` conventions; **test relevance** (§5) | nothing | sonnet |
 | **ux-validator** | UX of changed UI, at the level the architect set (§5) | nothing | sonnet |
+| **solo** | Benchmark only (M8): builds a landed shred alone, from the same spec + base | code + tests in its worktree | sonnet |
 
 **Twins** are one agent definition spawned fresh each turn. "A" and "B" are labels in the handoff, not
 two definitions.
@@ -186,11 +187,12 @@ one file plus the references the checks list.
 | Twin phase | PreToolUse `Edit\|Write` | twin | No phase removes a test line committed by an earlier turn (multiset vs `HEAD`). REFACTOR: no test file edits. BUILD: production edit only once a changed test references the requirement. Test files = profile `test-globs` |
 | Stay in the worktree | PreToolUse `Edit\|Write` | twin | Path outside the active shred's worktree (except its `handoff.md`) → deny. Bash is not parsed: the turn check flags main-repo changes made during the turn |
 | Turn complete | SubagentStop | twin | `shred.mjs` check: handoff at this turn and its last phase; every incoming open doubt resolved; no earlier test line removed; no main-repo change; gates green. Blocks ≤3 times per turn; `shred.mjs turn` refuses to advance until it passes |
+| Solo complete | SubagentStop | solo | `bench.mjs` checkBench: the twins' final-turn bar (gates, no `TODO`, every `R-xx` in a test, no main-repo change). Blocks ≤3, then `bench.mjs round` records what is missing. No phase guards |
 | UX deep evidence | SubagentStop | ux-validator at `deep` | One screenshot per UI acceptance criterion exists *(deferred: deep runs as simple)* |
 | Shred complete | SubagentStop | twin, final turn | Gates green, no `TODO`/`NotImplemented` in diff, every shred `R-xx` referenced by a test |
 | Human gates | PostToolUse `AskUserQuestion` | liftoff | Question tagged `[gate <id> <gate>]` answered `Approve…` → approval + doc hash in `state.json`; every answer logged to `gates.log`. `state.mjs step` refuses a step whose earlier gates are unapproved or whose doc changed since |
 | Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json`, `ledger.md` → deny |
-| Round cap | PreToolUse `Agent` | everyone | `guard-spawn`: twin only while a shred is in work, validator only while one is validating; escalated shred → deny. No work order in the repo → pass |
+| Round cap | PreToolUse `Agent` | everyone | `guard-spawn`: twin only while a shred is in work, validator only while one is validating (or a benchmark is); solo only while a benchmark is open; escalated shred → deny. No work order in the repo → pass |
 | Validator writes | PreToolUse `Edit|Write` | validators | Only its own `findings/r<k>-<role>.md` |
 | Liftoff writes no code | PreToolUse `Edit|Write` | liftoff | Target inside a shred worktree not yet landed → deny |
 | Ledger | SubagentStop | all | `ledger.mjs`: sum token usage (last entry per message id) + elapsed time (first → last entry) from `agent_transcript_path`; one row per agent id in the latest work order not yet final-approved, per-role totals. Fails open |
@@ -342,6 +344,12 @@ None. Agent names are provisional (§7).
 | 7 | Stack templates for empty repos | Idea → new app walking skeleton on both stacks |
 | 8 | Solo baseline benchmark | One agent builds a landed shred from the same spec + base commit in its own worktree; the same validators grade it once. Report: tokens, time, $, blocking findings, tests per `R-xx`, twins vs solo |
 
+**Running the benchmark (M8).** Once, by hand, on a shred landed since M8 and before final approval (the ledger
+stops logging after it): `bench.mjs open <id> <n>` → spawn `spaceport:solo` with its prompt → `bench.mjs round <id> <n>`
+→ spawn the printed validators in parallel → `bench.mjs report <id> <n>` writes `shreds/<n>/bench.md`. Ledger runs are
+attributed by start time (twins: shred opened → landed; solo: bench opened →). Twins show round-1 and all-round
+blocking findings; solo is graded once. $ from a price table in `bench.mjs`. The solo worktree is kept.
+
 ---
 
 ## Changelog
@@ -370,3 +378,4 @@ None. Agent names are provisional (§7).
 | 2026-10-15 | Milestone 6: ledger hook (one row per agent id, totals); postmortem after final approval; lessons tagged per role, inlined into twin/validator prompts | M6 planning; user picked role-tagged lessons, prompt-only postmortem |
 | 2026-10-15 | Milestone 8: solo baseline benchmark (cost + quality, twins vs one agent) | User: prove the factory's cost buys quality |
 | 2026-10-15 | Milestone 7: `scaffold.mjs` runs a stack recipe (official generators) into an empty repo, writes the profile, commits; template = green base, skeleton built by twins; `.liftoff/roadmap.md` splits an app into work orders | M7 planning; user picked generators, green base, roadmap file, current empty repo |
+| 2026-10-15 | Milestone 8 built: `solo` agent, `bench.mjs` open/round/report, solo completeness in `guard-turn`, bench-aware `guard-spawn`; ledger untouched (time-window attribution) | M8 planning; user picked completeness-only hooks for solo, no skill (one-off), round-1 + all-round comparison, price table |

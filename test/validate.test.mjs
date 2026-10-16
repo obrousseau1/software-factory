@@ -6,25 +6,10 @@ import { frontmatter } from '../scripts/frontmatter.mjs';
 import { checkTurn, dropShred, git, handoffPath, nextTurn, openShred, shredDir } from '../scripts/shred.mjs';
 import { MAX_ROUNDS, startRound, summary, verdict } from '../scripts/validate.mjs';
 import { getWorkOrder } from '../scripts/state.mjs';
-import { ID, SEED_TEST, TEST_FILE, makeRepo, setPhase, write } from './shred-repo.mjs';
+import { ID, SEED_TEST, TEST_FILE, built, makeRepo, setPhase, write } from './shred-repo.mjs';
 
 const CLEAN = '| # | Severity | Where | Finding |\n|---|----------|-------|---------|\n';
 const VALIDATORS = ['spec-validator', 'security-validator', 'standards-validator'];
-
-// Shred 1 built by three twin turns; returns { repo, worktree }.
-function built() {
-  const repo = makeRepo();
-  const { worktree } = openShred(repo, ID, 1);
-  nextTurn(repo, ID, 1);
-  write(worktree, TEST_FILE, `${SEED_TEST}\nR-01 adds\nR-02 subtracts\n`);
-  write(worktree, 'src/calc.js', 'export const add = (a, b) => a + b; // R-01\n');
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'BUILD');
-  nextTurn(repo, ID, 1);
-  setPhase(repo, 'REFACTOR');
-  assert.deepEqual(nextTurn(repo, ID, 1), { done: true });
-  return { repo, worktree };
-}
 
 const findings = (repo, round, rows = {}) => {
   for (const role of VALIDATORS) {

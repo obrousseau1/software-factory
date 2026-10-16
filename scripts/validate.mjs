@@ -14,10 +14,11 @@ import { getWorkOrder, woRoot } from './state.mjs';
 
 export const MAX_ROUNDS = 3;
 export const SEVERITIES = ['Critical', 'Major', 'Minor'];
-const BLOCKING = ['Critical', 'Major'];
+export const BLOCKING = ['Critical', 'Major'];
 const HEADER = /^\|\s*#\s*\|\s*Severity\s*\|\s*Where\s*\|\s*Finding\s*\|/m;
 
-const findingsPath = (repo, id, n, round, role) => join(shredDir(repo, id, n), 'findings', `r${round}-${role}.md`);
+// `label`: `r<k>` for round k, `solo` for the benchmark (bench.mjs).
+export const findingsPath = (repo, id, n, label, role) => join(shredDir(repo, id, n), 'findings', `${label}-${role}.md`);
 
 function shredOf(state, n, status) {
   const shred = state.shreds?.find((s) => s.n === n);
@@ -27,7 +28,7 @@ function shredOf(state, n, status) {
 }
 
 // Validators for a shred: ux only when the plan gives it a UX level.
-function validatorsFor(repo, id, n) {
+export function validatorsFor(repo, id, n) {
   const ux = shreds(readFileSync(join(woRoot(repo), id, 'plan.md'), 'utf8')).find((s) => s.n === n)?.ux ?? 'none';
   return { ux, roles: ux === 'none' ? VALIDATORS.filter((role) => role !== Role.UxValidator) : VALIDATORS };
 }
@@ -51,7 +52,7 @@ export function startRound(repo, id, n) {
   const validators = roles.map((role) => ({
     agent: `${PLUGIN}:${role}`,
     prompt: `Work order: ${id}. Shred ${n}, round ${round}. Repo: ${repo}. Worktree: ${shred.worktree}. Diff: ${diff}. `
-      + `Handoff: ${handoffPath(repo, id, n)}. Findings file: ${findingsPath(repo, id, n, round, role)}.`
+      + `Handoff: ${handoffPath(repo, id, n)}. Findings file: ${findingsPath(repo, id, n, `r${round}`, role)}.`
       + (role === Role.UxValidator ? ` UX level: ${level}.` : '') + earlier + lessonsNote(repo, role),
   }));
   return { round, validators, warnings: ux === 'deep' ? ['UX deep runs as simple (Playwright not built yet).'] : [] };
@@ -93,11 +94,11 @@ function addDoubts(file, round, blocking) {
 }
 
 // Every validator's findings of the round, tagged with its role; throws naming each missing / malformed file.
-function roundFindings(repo, id, n, round) {
+export function roundFindings(repo, id, n, label) {
   const errors = [];
   const findings = validatorsFor(repo, id, n).roles.flatMap((role) => {
     try {
-      return parseFindings(findingsPath(repo, id, n, round, role)).map((f) => ({ ...f, role }));
+      return parseFindings(findingsPath(repo, id, n, label, role)).map((f) => ({ ...f, role }));
     } catch (error) {
       errors.push(error.message);
       return [];
@@ -118,12 +119,12 @@ export function verdict(repo, id, n) {
   const state = getWorkOrder(repo, id);
   const shred = shredOf(state, n, 'validating');
   const { round } = shred;
-  const findings = roundFindings(repo, id, n, round);
+  const findings = roundFindings(repo, id, n, `r${round}`);
   const minor = [...(shred.minor ?? []), ...findings.filter((f) => f.severity === 'Minor').map(({ remove, ...f }) => ({ round, ...f }))];
   const blocking = findings.filter((f) => BLOCKING.includes(f.severity));
   if (!blocking.length) {
     land(repo, id, shred);
-    saveShred(repo, state, { ...shred, status: 'landed', minor });
+    saveShred(repo, state, { ...shred, status: 'landed', minor, landedAt: new Date().toISOString() });
     return { pass: true, round, landed: woBranch(id), minor: minor.length };
   }
   if (round >= MAX_ROUNDS) {

@@ -44,18 +44,22 @@ export const handoffPath = (repo, id, n) => join(shredDir(repo, id, n), 'handoff
 // Validated shreds fast-forward into this branch.
 export const woBranch = (id) => `spaceport/${id}`;
 
-// The first shred with `status` across all work orders: { state, shred } or null.
-export function shredWith(repo, status) {
+// The first shred matching across all work orders: { state, shred } or null.
+export function shredWhere(repo, match) {
   const root = woRoot(repo);
   if (!existsSync(root)) return null;
   for (const id of readdirSync(root)) {
     if (!existsSync(join(root, id, 'state.json'))) continue;
     const state = getWorkOrder(repo, id);
-    const shred = state.shreds?.find((s) => s.status === status);
+    const shred = state.shreds?.find(match);
     if (shred) return { state, shred };
   }
   return null;
 }
+
+export const shredWith = (repo, status) => shredWhere(repo, (s) => s.status === status);
+// The first shred whose solo benchmark (bench.mjs) has `status`.
+export const benchWith = (repo, status) => shredWhere(repo, (s) => s.bench?.status === status);
 
 // The one shred in `work`: twins write only there.
 export const activeShred = (repo) => shredWith(repo, 'work');
@@ -121,11 +125,11 @@ export function runSetup(repo, cwd) {
   return evidence === null ? [] : [`setup failed: ${evidence}`];
 }
 
-const mainStatus = (repo) => git(repo, 'status', '--porcelain', '-uall')
+export const mainStatus = (repo) => git(repo, 'status', '--porcelain', '-uall')
   .split('\n')
   .filter((line) => line && !line.slice(3).startsWith('.liftoff/'));
 
-function planShred(repo, id, n) {
+export function planShred(repo, id, n) {
   const plan = readFileSync(join(woRoot(repo), id, 'plan.md'), 'utf8');
   const shred = shreds(plan).find((s) => s.n === n);
   if (!shred) throw new Error(`plan.md has no shred ${n}`);
@@ -163,7 +167,7 @@ export function openShred(repo, id, n) {
     git(repo, 'branch', '-D', branch);
     throw new Error(`Base is red, fix the repo first: ${red.join('; ')}`);
   }
-  const shred = { n, status: 'work', worktree, branch, base: git(worktree, 'rev-parse', 'HEAD').trim(), turn: -1 };
+  const shred = { n, status: 'work', worktree, branch, base: git(worktree, 'rev-parse', 'HEAD').trim(), turn: -1, opened: new Date().toISOString() };
   saveState(repo, { ...state, shreds: [...(state.shreds ?? []), shred] });
   return shred;
 }
@@ -242,7 +246,7 @@ function testLineErrors(shred, profile) {
 }
 
 // Shred complete: nothing unfinished in its diff, every requirement referenced by a changed test.
-function shredErrors(repo, id, shred, profile) {
+export function shredErrors(repo, id, shred, profile) {
   const changed = changes(shred.worktree, shred.base);
   const errors = changed
     .filter(({ before, after }) => removedLines(after, before).some((line) => UNFINISHED.test(line)))

@@ -58,7 +58,7 @@ const cells = (line) => line.split('|').slice(1, -1).map((cell) => cell.trim());
 const row = (values) => `| ${values.join(' | ')} |`;
 const header = (titles) => `${row(titles)}\n${row(titles.map(() => '---'))}`;
 
-function readRuns(md) {
+export function readRuns(md) {
   return section(md, 'Runs').split(/\r?\n/).slice(2)
     .filter((line) => line.startsWith('|'))
     .map((line) => {

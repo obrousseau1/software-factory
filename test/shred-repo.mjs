@@ -2,7 +2,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { git, handoffPath } from '../scripts/shred.mjs';
+import assert from 'node:assert/strict';
+import { git, handoffPath, nextTurn, openShred } from '../scripts/shred.mjs';
 
 export const ID = '001-calc';
 export const TEST_FILE = 'tests/calc.test.js';
@@ -63,4 +64,19 @@ export function setPhase(repo, phase, n = 1) {
 export function addDoubt(repo, row, n = 1) {
   const file = handoffPath(repo, ID, n);
   writeFileSync(file, `${readFileSync(file, 'utf8').trimEnd()}\n${row}\n`);
+}
+
+// Shred 1 built by three twin turns; returns { repo, worktree }.
+export function built() {
+  const repo = makeRepo();
+  const { worktree } = openShred(repo, ID, 1);
+  nextTurn(repo, ID, 1);
+  write(worktree, TEST_FILE, `${SEED_TEST}\nR-01 adds\nR-02 subtracts\n`);
+  write(worktree, 'src/calc.js', 'export const add = (a, b) => a + b; // R-01\n');
+  nextTurn(repo, ID, 1);
+  setPhase(repo, 'BUILD');
+  nextTurn(repo, ID, 1);
+  setPhase(repo, 'REFACTOR');
+  assert.deepEqual(nextTurn(repo, ID, 1), { done: true });
+  return { repo, worktree };
 }
