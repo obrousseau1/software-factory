@@ -10,6 +10,7 @@ run: dotnet build src/{{Name}} -t:Run
 req-tag: xUnit [Trait("Req", "R-01")]
 test-globs: tests/**
 ui-globs: **/*.xaml, **/*.xaml.cs
+sensitive-globs: **/MauiProgram.cs, **/*Auth*, **/*Auth*/**, **/*Http*.cs, **/*Storage*.cs, **/*.csproj
 ---
 
 # Repo profile

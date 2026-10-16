@@ -3,21 +3,18 @@
 //   node shred.mjs check <id> <n>   → prints { ok, errors } for the build in progress; exit 1 when not ok
 //   node shred.mjs built <id> <n>   → checks and commits the build, marks the shred built; refuses an incomplete build
 //   node shred.mjs drop <id> <n>    → removes the shred's worktree, branch, folder and state entry (to redo it)
-import { spawnSync, execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { shreds } from './docs.mjs';
+import { runGates, runSetup } from './gates.mjs';
 import { lessonsNote } from './lessons.mjs';
-import { NONE, gateCommands, isTest, profilePath, readProfile } from './profile.mjs';
+import { isTest, profilePath, readProfile } from './profile.mjs';
 import { PLUGIN, Role } from './roles.mjs';
 import { getWorkOrder, saveState, woRoot } from './state.mjs';
 
 export const MAX_BLOCKS = 3;
-const GATE_TIMEOUT_MS = 10 * 60 * 1000;
-const GREEN_KEPT = 20;
 const UNFINISHED = /\bTODO\b|NotImplemented/;
 
 export const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -84,55 +81,6 @@ export function changes(worktree, ref) {
   });
 }
 
-// ponytail: shell is cmd.exe on Windows (no bash: `bash` there may be the WSL launcher); profile commands
-// using bash-only syntax fail. Point at Git Bash if a repo needs it.
-// The command's first error line, or null when it passes.
-function failure(command, cwd) {
-  const run = spawnSync(command, { cwd, shell: true, encoding: 'utf8', timeout: GATE_TIMEOUT_MS });
-  if (run.status === 0) return null;
-  const output = lines(`${run.stdout ?? ''}\n${run.stderr ?? ''}`);
-  const evidence = output.find((line) => /error|fail/i.test(line)) ?? output.at(-1) ?? run.error?.message ?? `exit ${run.status}`;
-  return evidence.slice(0, 200);
-}
-
-// Content hash of the worktree as it is, untracked files included, without touching its index.
-export function treeHash(cwd) {
-  const index = join(tmpdir(), `spaceport-index-${process.pid}-${Date.now()}`);
-  const real = git(cwd, 'rev-parse', '--path-format=absolute', '--git-path', 'index').trim();
-  if (existsSync(real)) copyFileSync(real, index);
-  const env = { ...process.env, GIT_INDEX_FILE: index };
-  try {
-    execFileSync('git', ['add', '-A'], { cwd, env, stdio: 'ignore' });
-    return execFileSync('git', ['write-tree'], { cwd, env, encoding: 'utf8' }).trim();
-  } finally {
-    rmSync(index, { force: true });
-  }
-}
-
-const greenFile = (repo) => join(repo, '.liftoff', 'gates-green.json');
-const greenKeys = (repo) => existsSync(greenFile(repo)) ? JSON.parse(readFileSync(greenFile(repo), 'utf8')) : [];
-
-// Gates of a tree and command set already green are not run again. Only green is cached: a red gate may be flaky.
-export function runGates(repo, cwd) {
-  const commands = gateCommands(readProfile(profilePath(repo)));
-  const key = createHash('sha256').update(`${treeHash(cwd)}\n${JSON.stringify(commands)}`).digest('hex');
-  const green = greenKeys(repo);
-  if (green.includes(key)) return [];
-  const errors = Object.entries(commands)
-    .map(([gate, command]) => [gate, failure(command, cwd)])
-    .filter(([, evidence]) => evidence !== null)
-    .map(([gate, evidence]) => `gate ${gate} red: ${evidence}`);
-  if (!errors.length) writeFileSync(greenFile(repo), JSON.stringify([...green, key].slice(-GREEN_KEPT)));
-  return errors;
-}
-
-// Installs the dependencies a fresh worktree lacks (profile `setup`); [] when it passes or is none.
-export function runSetup(repo, cwd) {
-  const { setup } = readProfile(profilePath(repo));
-  const evidence = setup === NONE ? null : failure(setup, cwd);
-  return evidence === null ? [] : [`setup failed: ${evidence}`];
-}
-
 export const mainStatus = (repo) => git(repo, 'status', '--porcelain', '-uall')
   .split('\n')
   .filter((line) => line && !line.slice(3).startsWith('.liftoff/'));
@@ -178,10 +126,12 @@ export function openShred(repo, id, n) {
   const base = git(worktree, 'rev-parse', 'HEAD').trim();
   const shred = { n, status: 'work', worktree, branch, base, blocks: 0, opened: new Date().toISOString(), mainStatus: mainStatus(repo) };
   saveState(repo, { ...state, shreds: [...(state.shreds ?? []), shred] });
-  const prompt = `Work order: ${id}. Shred ${n}: build ${planShred(repo, id, n).reqs.join(', ')}. Repo: ${repo}. Worktree: ${worktree}.`
-    + lessonsNote(repo, Role.Builder);
-  return { ...shred, agent: `${PLUGIN}:${Role.Builder}`, prompt };
+  return { n, worktree, agent: `${PLUGIN}:${Role.Builder}`, prompt: builderPrompt(repo, id, n, worktree) };
 }
+
+const builderPrompt = (repo, id, n, worktree) =>
+  `Work order: ${id}. Shred ${n}: build ${planShred(repo, id, n).reqs.join(', ')}. Repo: ${repo}. Worktree: ${worktree}.`
+  + lessonsNote(repo, Role.Builder);
 
 // Problems with the build in progress; [] = complete. Gates run last, only when everything else passes.
 export function checkBuild(repo, id, n) {
@@ -225,8 +175,9 @@ export function markBuilt(repo, id, n) {
   if (errors.length) throw new Error(`Shred ${n} is not complete: ${errors.join('; ')}`);
   const state = getWorkOrder(repo, id);
   const shred = findShred(state, n);
+  const buildNumber = (shred.round ?? 0) + 1;
   git(shred.worktree, 'add', '-A');
-  git(shred.worktree, 'commit', '--allow-empty', '-m', `spaceport ${id} shred ${n} build ${(shred.round ?? 0) + 1}`);
+  git(shred.worktree, 'commit', '--allow-empty', '-m', `spaceport ${id} shred ${n} build ${buildNumber}`);
   saveShred(repo, state, { ...shred, status: 'built', licenses: undefined });
   return { built: n };
 }

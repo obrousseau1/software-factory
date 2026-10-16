@@ -37,6 +37,12 @@ The .NET test projects' folders plus the web test files, e.g. `tests/**, <web>/s
 
 `<web>/src/**/*.tsx`, `<web>/src/**/*.css`.
 
+## sensitive-globs
+
+Where the security reviewer looks: trust boundaries, auth, secrets, dependencies. The .NET side:
+`**/Program.cs`, `**/*Controller.cs`, `**/*Endpoints.cs`, `**/*Auth*`, `**/*Auth*/**`, `**/appsettings*.json`, `**/*.csproj`; the web side: `<web>/src/**/api/**`, `<web>/src/**/*Auth*`,
+`<web>/package.json`. Add the repo's own auth or parsing folders.
+
 ## Watch
 
 - A `test` script without `run` starts Vitest in watch mode: use `vitest run`.

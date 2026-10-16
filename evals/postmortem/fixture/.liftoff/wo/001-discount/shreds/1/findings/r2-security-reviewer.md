@@ -1,4 +1,4 @@
-# Findings: security-validator, round 2
+# Findings: security-reviewer, round 2
 
 | # | Severity | Where | Finding |
 |---|----------|-------|---------|

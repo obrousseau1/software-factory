@@ -10,6 +10,7 @@ run: dotnet run --project src/Shop.Api/Shop.Api.csproj
 req-tag: xUnit [Trait("Req", "R-01")]; Vitest test name starts with "R-01:"
 test-globs: tests/**, web/src/**/*.test.ts, web/src/**/*.test.tsx
 ui-globs: web/src/**/*.tsx, web/src/**/*.css
+sensitive-globs: **/Program.cs, **/*Controller.cs, **/*Endpoints.cs, **/*Auth*, **/*Auth*/**, **/appsettings*.json, **/*.csproj, web/src/**/api/**, web/src/**/*Auth*, web/package.json
 ---
 
 # Repo profile

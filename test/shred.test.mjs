@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkBuild, git, markBuilt, openShred, removedLines, runGates } from '../scripts/shred.mjs';
+import { runGates } from '../scripts/gates.mjs';
+import { checkBuild, git, markBuilt, openShred, removedLines } from '../scripts/shred.mjs';
 import { getWorkOrder } from '../scripts/state.mjs';
 import { ID, SEED_TEST, TEST_FILE, buildAll, makeRepo, write } from './shred-repo.mjs';
 

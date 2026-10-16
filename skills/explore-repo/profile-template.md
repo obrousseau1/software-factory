@@ -10,6 +10,7 @@ run: <command that starts the app | none>
 req-tag: <how a test names the R-xx it covers, per test framework>
 test-globs: <comma-separated globs of test files and folders; hooks protect these>
 ui-globs: <comma-separated globs of UI source files | none>
+sensitive-globs: <comma-separated globs of auth, trust-boundary input, secrets, external I/O, dependency manifests | none; drop the line when unsure: security then reviews every shred>
 ---
 
 # Repo profile

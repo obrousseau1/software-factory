@@ -140,7 +140,7 @@ export function verdict(repo, id, n) {
   }
   if (round >= MAX_ROUNDS) {
     saveShred(repo, state, { ...shred, status: 'escalated', minor });
-    return { pass: false, round, escalated: true, blocking };
+    return { pass: false, round, escalated: true, blocking: blocking.map((f) => `[${f.severity}] ${f.role}: ${f.where}: ${f.finding}`) };
   }
   saveShred(repo, state, { ...shred, status: 'work', blocks: 0, minor, licenses: licenses(blocking) });
   return { pass: false, round, escalated: false, blocking: blocking.length, fix: fixMessage(round, blocking) };

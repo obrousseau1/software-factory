@@ -19,10 +19,14 @@ const findings = (repo, round, rows = {}) => {
 const shred = (repo) => getWorkOrder(repo, ID).shreds[0];
 const MAJOR = { reviewer: '| 1 | Major | src/calc.js:1 | R-02 subtract missing |\n' };
 
-// Profile with `sensitive-globs: <globs>`.
-function sensitive(repo, globs) {
+// Shred 1 built in a repo whose profile has `sensitive-globs: <globs>`; returns the repo.
+function builtWith(globs) {
+  const repo = makeRepo();
   const file = join(repo, '.liftoff', 'profile.md');
   write(repo, '.liftoff/profile.md', readFileSync(file, 'utf8').replace('ui-globs: none\n', `ui-globs: none\nsensitive-globs: ${globs}\n`));
+  buildAll(openShred(repo, ID, 1).worktree);
+  markBuilt(repo, ID, 1);
+  return repo;
 }
 
 // Fails a round, then the builder's fix round leaves the shred built again.
@@ -45,27 +49,11 @@ test('round writes the diff and prompts each reviewer; reviewer gets the UX leve
 });
 
 test('security reviewer only when the diff touches sensitive-globs; none → never', () => {
-  const repo = makeRepo();
-  sensitive(repo, 'src/auth/**');
-  const { worktree } = openShred(repo, ID, 1);
-  buildAll(worktree);
-  markBuilt(repo, ID, 1);
-  assert.deepEqual(startRound(repo, ID, 1).reviewers.map((r) => r.agent), ['spaceport:reviewer']);
-  assert.deepEqual(shred(repo).reviewers, ['reviewer']);
-
-  const touched = makeRepo();
-  sensitive(touched, 'src/calc.js, src/auth/**');
-  const opened = openShred(touched, ID, 1);
-  buildAll(opened.worktree);
-  markBuilt(touched, ID, 1);
-  assert.equal(startRound(touched, ID, 1).reviewers.length, 2);
-
-  const never = makeRepo();
-  sensitive(never, 'none');
-  const third = openShred(never, ID, 1);
-  buildAll(third.worktree);
-  markBuilt(never, ID, 1);
-  assert.equal(startRound(never, ID, 1).reviewers.length, 1);
+  const untouched = builtWith('src/auth/**');
+  assert.deepEqual(startRound(untouched, ID, 1).reviewers.map((r) => r.agent), ['spaceport:reviewer']);
+  assert.deepEqual(shred(untouched).reviewers, ['reviewer']);
+  assert.equal(startRound(builtWith('src/calc.js, src/auth/**'), ID, 1).reviewers.length, 2);
+  assert.equal(startRound(builtWith('none'), ID, 1).reviewers.length, 1);
 });
 
 test('each reviewer prompt carries only its own lessons', () => {
@@ -121,7 +109,9 @@ test(`round ${MAX_ROUNDS} failing escalates; no further round`, () => {
   failAndFix(repo, 1);
   startRound(repo, ID, 1);
   findings(repo, 2, MAJOR);
-  assert.equal(verdict(repo, ID, 1).escalated, true);
+  assert.deepEqual(verdict(repo, ID, 1), {
+    pass: false, round: 2, escalated: true, blocking: ['[Major] reviewer: src/calc.js:1: R-02 subtract missing'],
+  });
   assert.equal(shred(repo).status, 'escalated');
   assert.throws(() => startRound(repo, ID, 1), /is escalated, not built/);
   assert.deepEqual(checkBuild(repo, ID, 1), ['Shred 1 is escalated: no build to check.']);

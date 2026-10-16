@@ -4,7 +4,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { currentWorkOrder, record, usage } from '../scripts/ledger.mjs';
+import { usage } from '../scripts/costs.mjs';
+import { currentWorkOrder, record } from '../scripts/ledger.mjs';
 import { ID, makeRepo, write } from './shred-repo.mjs';
 
 const script = fileURLToPath(new URL('../scripts/ledger.mjs', import.meta.url));

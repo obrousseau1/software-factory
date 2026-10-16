@@ -10,6 +10,7 @@ run: dotnet build Notes.App/Notes.App.csproj -t:Run -f net10.0-windows10.0.19041
 req-tag: xUnit [Trait("Req", "R-01")]
 test-globs: Notes.Core.Tests/**
 ui-globs: **/*.xaml, **/*.xaml.cs
+sensitive-globs: **/MauiProgram.cs, **/*Auth*, **/*Auth*/**, **/*Http*.cs, **/*Storage*.cs, **/*.csproj
 ---
 
 # Repo profile

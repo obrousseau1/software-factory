@@ -1,4 +1,4 @@
-# Findings: standards-validator, round 2
+# Findings: reviewer, round 2
 
 | # | Severity | Where | Finding |
 |---|----------|-------|---------|

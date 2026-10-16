@@ -34,6 +34,11 @@ The test projects' folders, e.g. `<Name>.Tests/**`.
 
 `**/*.xaml`, `**/*.xaml.cs`.
 
+## sensitive-globs
+
+Where the security reviewer looks: auth, secure storage, HTTP clients, dependencies.
+`**/MauiProgram.cs`, `**/*Auth*`, `**/*Auth*/**`, `**/*Http*.cs`, `**/*Storage*.cs`, `**/*.csproj`; add the repo's own auth or storage folders.
+
 ## Watch
 
 - Building all target frameworks needs the Android/iOS workloads: build one framework.

@@ -35,6 +35,11 @@ The test projects' folders, e.g. `tests/**` or `<Name>.Tests/**`.
 
 `none`, unless Razor/Blazor views exist: `**/*.cshtml`, `**/*.razor`.
 
+## sensitive-globs
+
+Where the security reviewer looks: trust boundaries, auth, secrets, dependencies.
+`**/Program.cs`, `**/*Controller.cs`, `**/*Endpoints.cs`, `**/*Auth*`, `**/*Auth*/**`, `**/appsettings*.json`, `**/*.csproj`; add the repo's own auth or parsing folders.
+
 ## Watch
 
 - CI test filters (`--filter "Category!=Integration"`) exclude tests that need live services:

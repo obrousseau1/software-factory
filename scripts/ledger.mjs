@@ -1,9 +1,11 @@
 // SubagentStop hook (every agent): sums a subagent's real token usage and elapsed time from its transcript into the
 // current work order's ledger.md, one row per agent id (a blocked or resumed builder stops more than once), with per-role totals.
 // Fails open: logging must never trap an agent.
+//   node ledger.mjs cost <id>   → prints the work order's true $, total and per role (costs.mjs reconcile)
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { PROJECTS, reconcile, usage } from './costs.mjs';
 import { section } from './docs.mjs';
 import { bare } from './roles.mjs';
 import { mainRepo, shredWhere } from './shred.mjs';
@@ -12,36 +14,6 @@ import { getWorkOrder, woRoot } from './state.mjs';
 const TEXT = ['agent', 'role', 'model', 'started'];
 const NUMBERS = ['seconds', 'input', 'cacheWrite', 'cacheRead', 'output'];
 const TITLES = ['Seconds', 'Input', 'Cache write', 'Cache read', 'Output'];
-
-// Transcript JSONL → usage. An assistant message repeats once per content block with growing output_tokens:
-// keep the last entry per message id.
-export function usage(jsonl) {
-  const messages = new Map();
-  let first, last, model;
-  for (const line of jsonl.split(/\r?\n/)) {
-    let entry;
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (entry.timestamp) [first, last] = [first ?? entry.timestamp, entry.timestamp];
-    const message = entry.type === 'assistant' ? entry.message : null;
-    if (!message?.usage) continue;
-    messages.set(message.id ?? entry.uuid, message.usage);
-    model = message.model ?? model;
-  }
-  const sum = (key) => [...messages.values()].reduce((total, u) => total + (u[key] ?? 0), 0);
-  return {
-    model: model ?? 'unknown',
-    started: first ?? 'unknown',
-    seconds: first ? Math.round((Date.parse(last) - Date.parse(first)) / 1000) : 0,
-    input: sum('input_tokens'),
-    cacheWrite: sum('cache_creation_input_tokens'),
-    cacheRead: sum('cache_read_input_tokens'),
-    output: sum('output_tokens'),
-  };
-}
 
 // A shred being built or reviewed: its runs belong to its work order.
 const inProgress = (shred) => ['work', 'reviewing'].includes(shred.status);
@@ -97,10 +69,31 @@ export function record(input) {
   return file;
 }
 
+const dollars = (runs) => Math.round(runs.reduce((total, run) => total + run.cost, 0) * 100) / 100;
+
+// True $ of a work order's ledger runs: { total, roles: { <role>: $ }, reconciled: '<n>/<runs>' }.
+export function costReport(repo, id, projects = PROJECTS) {
+  const file = join(woRoot(repo), id, 'ledger.md');
+  if (!existsSync(file)) throw new Error(`No ledger for work order ${id}.`);
+  const runs = reconcile(readRuns(readFileSync(file, 'utf8')), projects);
+  const roles = Object.fromEntries([...Map.groupBy(runs, (run) => run.role)].map(([role, group]) => [role, dollars(group)]));
+  return { total: dollars(runs), roles, reconciled: `${runs.filter((run) => run.reconciled).length}/${runs.length}` };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try {
-    record(JSON.parse(readFileSync(0, 'utf8')));
-  } catch (error) {
-    console.error(`ledger skipped: ${error.message}`);
+  const [command, id] = process.argv.slice(2);
+  if (command === 'cost') {
+    try {
+      console.log(JSON.stringify(costReport(mainRepo(process.cwd()), id ?? ''), null, 2));
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
+  } else {
+    try {
+      record(JSON.parse(readFileSync(0, 'utf8')));
+    } catch (error) {
+      console.error(`ledger skipped: ${error.message}`);
+    }
   }
 }

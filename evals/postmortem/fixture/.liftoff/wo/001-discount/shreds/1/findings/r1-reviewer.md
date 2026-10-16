@@ -1,4 +1,4 @@
-# Findings: spec-validator, round 1
+# Findings: reviewer, round 1
 
 | # | Severity | Where | Finding |
 |---|----------|-------|---------|

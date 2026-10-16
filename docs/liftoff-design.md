@@ -3,7 +3,7 @@
 Liftoff turns a one-line idea into reviewed, tested, merged-ready code in any repo, through a fixed
 line of Claude Code agents. Goal: **consistent quality**, not speed or autonomy.
 
-Status: design, ready to build. Decisions marked *(proposed)* are not confirmed yet.
+Status: built through milestone 9 (lean line); its manual end-to-end run is pending.
 
 ---
 
@@ -21,20 +21,19 @@ Status: design, ready to build. Decisions marked *(proposed)* are not confirmed 
 ## 2. Lifecycle
 
 ```
- idea ─▶ 1 INTENT ✋ ─▶ 2 SPECS ✋ ─▶ 3 PLAN ─▶ 4 SHRED ✋ ─▶ 5 WORK ⇄ VALIDATE ─▶ 6 FINAL ✋
-                                                         (per shred, ≤3 rounds)
-                                                          round 3 fails ─▶ ✋ escalate
+ idea ─▶ 1 INTENT ✋ ─▶ 2 DOCS ✋ ─▶ 3 WORK ⇄ 4 REVIEW ─▶ 5 FINAL ✋
+                                  (per shred, ≤2 rounds)
+                                   round 2 fails ─▶ ✋ escalate
 ```
 
 | # | Step | Who | Output | Human gate |
 |---|------|-----|--------|-----------|
 | 0 | Explore *(first run on a repo only)* | profiler | `.liftoff/profile.md` | — |
 | 1 | Intent | liftoff ⇄ you, explorer on demand | `intent.md` + size verdict | ✋ interactive |
-| 2 | Specs | architect | `spec.md` with requirement IDs | ✋ approve |
-| 3 | Plan | architect | `plan.md` | — |
-| 4 | Shred | architect | shred list in `plan.md` | ✋ approve plan + shreds |
-| 5 | Work + validate | twins, then 4 validators | code in a worktree, findings | ✋ only on escalation |
-| 6 | Final approval | liftoff → you | PR + summary | ✋ approve |
+| 2 | Docs | architect | `spec.md` (`R-xx`, each with a `Test:` line) + `plan.md` (approach + shreds) | ✋ approve both |
+| 3 | Work | builder | code + tests in the shred's worktree | ✋ only on escalation |
+| 4 | Review | reviewer (+ security reviewer on sensitive paths) | findings | ✋ only on escalation |
+| 5 | Final approval | liftoff → you | branch + summary | ✋ approve |
 
 **Sizing (step 1).** Liftoff decides:
 - **Feature** → one work order on the current repo.
@@ -42,14 +41,14 @@ Status: design, ready to build. Decisions marked *(proposed)* are not confirmed 
   work orders listed in `.liftoff/roadmap.md`. The first is always a walking skeleton (builds, one
   screen/endpoint, one passing test); final approval offers the next item.
 
-**Design round-trip (steps 2-4).** Subagents cannot ask the user. The architect's first spawn returns
+**Design round-trip (step 2).** Subagents cannot ask the user. The architect's first spawn returns
 options, a recommendation and open questions; liftoff asks them with `AskUserQuestion`, then re-spawns it
-with the answers to draft (max 2 question rounds per step). One spawn drafts the plan and its shreds; the
-shred step only checks coverage (`scripts/docs.mjs`) before the joint gate.
+with the answers to draft spec and plan in one pass (max 2 question rounds). `scripts/docs.mjs` checks a
+`Test:` line per requirement and shred coverage before the joint gate.
 
-**Validate loop (step 5).** Validators run after the twins declare a shred done. Liftoff routes each
-finding back to the twins. Max **3 rounds**; still failing → liftoff halts that shred and escalates with
-the open findings.
+**Review loop (steps 3-4).** Reviewers run once the builder's shred passes `shred.mjs built`. Blocking
+findings go back to the **same builder** (`SendMessage`, warm context). Max **2 rounds**; still failing →
+liftoff halts that shred and escalates with the open findings.
 
 ---
 
@@ -62,73 +61,58 @@ Liftoff is the **main session**, not a subagent. Everything else is a subagent s
 | **liftoff** (main) | Talks to you, routes work, owns state, amends living docs, manages worktrees | `.liftoff/**` | session model |
 | **explorer** | Answers "what exists?" about the code | nothing | haiku |
 | **profiler** | First run on a repo: writes the profile; stack proposal for unknown shapes | `profile.md`, `proposals/**` | sonnet |
-| **architect** | Brainstorms options, drafts specs, plan, shreds | nothing — returns drafts to liftoff | opus |
-| **twin** | Senior programmer; one half of the ping-pong pair | code + tests in its worktree | sonnet |
-| **spec-validator** | Code conforms to spec: every requirement done, nothing extra | nothing | sonnet |
-| **security-validator** | Vulnerabilities, secrets, unsafe patterns in the diff | nothing | opus |
-| **standards-validator** | Coding standards, design, naming, per `profile.md` conventions; **test relevance** (§5) | nothing | sonnet |
-| **ux-validator** | UX of changed UI, at the level the architect set (§5) | nothing | sonnet |
-| **solo** | Benchmark only (M8): builds a landed shred alone, from the same spec + base | code + tests in its worktree | sonnet |
-
-**Twins** are one agent definition spawned fresh each turn. "A" and "B" are labels in the handoff, not
-two definitions.
+| **architect** | Brainstorms options, drafts spec + plan (with shreds) in one pass | nothing — returns drafts to liftoff | opus |
+| **builder** | Senior programmer; builds a whole shred test-first, then fixes review findings | code + tests in its worktree | sonnet |
+| **reviewer** | Spec conformance, test relevance, standards, UX at the plan's level (§5) | its findings file | sonnet |
+| **security-reviewer** | Vulnerabilities, secrets, unsafe patterns; only when the diff touches `sensitive-globs` | its findings file | opus |
 
 ---
 
-## 4. Twin rotation protocol
+## 4. Builder
 
-One spawn per requirement. The incoming twin first attacks the previous twin's work, then improves
-it, then builds the next requirement.
+One spawn per shred. The prompt names the shred's requirements and worktree; the builder reads the
+spec, the plan row and the profile, then goes red → green → refactor per requirement.
 
-```
- turn 1   Twin A : BUILD R-01
- turn 2   Twin B : CHALLENGE R-01 → REFACTOR R-01 → BUILD R-02
- turn 3   Twin A : CHALLENGE R-02 → REFACTOR R-02 → BUILD R-03
- …
- last     other twin : CHALLENGE + REFACTOR only → shred complete
-```
+- Each requirement's `Test:` line says where and what to assert; tests go in the shred's Region test
+  file, tagged with the profile's `req-tag`. Each test must fail without the code it covers.
+- Hooks (§7) keep it in the worktree, protect committed test lines, and block its stop until the build
+  is complete (gates green, no `TODO`, every `R-xx` in a changed test).
+- `shred.mjs built` re-checks after it returns (a dropped block is caught here), commits, marks the shred
+  `built`. Refused → liftoff sends the errors back to the same builder once.
+- **Fix round.** Blocking review findings come back as one `SendMessage` to the same builder (verified:
+  same `agent_id`, hooks fire, warm cache). It fixes or rejects each `F<k>-<i>` with a reason. A new
+  session has lost the agent id → a fresh builder gets the same message.
 
-| Phase | Does | May not |
-|-------|------|---------|
-| **CHALLENGE** | Add edge-case tests (boundaries, nulls, errors, unread requirement clauses); strengthen weak tests ("would this pass if the code were wrong?"); fix what they expose; resolve every doubt in `handoff.md` (fixed / rejected with reason / escalated) | Delete or weaken an existing test; skip a doubt |
-| **REFACTOR** | Improve design of the previous requirement's code; tests stay green | Touch any test file |
-| **BUILD** | Red → green for the next requirement; list doubts and design choices in `handoff.md` | Write production code before its failing test |
-
-- Every turn is a **fresh context**; `handoff.md` is the only continuity: current phase, requirement
-  in play, what's done, design choices, open doubts.
-- A twin never challenges or refactors its own work.
-- Cost: ~1 spawn per requirement + 1 final.
-- Current phase lives in `handoff.md` front matter. Hooks read it (§7).
+Why not twins (M4-M8): four benchmarks showed the BUILD → CHALLENGE → REFACTOR rotation cost 3-6× more
+and took 4-6× longer than one agent, with no better real-defect catch; most of its blocking findings were
+test bloat its own CHALLENGE phase created.
 
 ---
 
-## 5. Validators
+## 5. Review
 
-- Run **in parallel**, **read-only**, against the shred's worktree diff.
-- Each writes its own findings file per round (`findings/r<k>-<role>.md`, `log-finding` skill), each
-  finding graded **Critical / Major / Minor**. `validate.mjs verdict` reads them; liftoff never transcribes.
-- Critical and Major block the round: they become open `F<k>-<i>` doubts in `handoff.md` and the other twin
-  runs one fix turn (CHALLENGE only) that must resolve each. A spec gap is escalated by the twin.
-- A twin never deletes a test line on its own. A blocking finding may license it: the validator quotes the
-  exact lines under `## Remove`; in the fix turn only those lines may go (hooks subtract them).
-- Minor is logged and shown at final approval.
+- Reviewers run **in parallel**, **read-only**, against the shred's diff (`review.mjs round` writes it).
+  The reviewer always; the security reviewer only when the diff touches profile `sensitive-globs`
+  (missing key → always, `none` → never). The set is stored in the shred at round start.
+- Each writes its own findings file per round (`findings/r<k>-<role>.md`, `log-finding` skill).
+  `review.mjs verdict` reads them; liftoff never transcribes.
+- **Severity rubric** (log-finding). Critical: data loss, or exploitable as written. Major: a
+  requirement clause broken or untested; new UI not accessible; a security risk under plausible use; a
+  test that cannot fail. **Everything else is Minor** (naming, taste, scope creep, a test outside the
+  Region). Critical and Major block the round; Minor is shown at final approval.
+- A blocking finding may license deleting test lines: the reviewer quotes them under `## Remove`; in the
+  fix round only those lines may go (hooks subtract them). A malformed block → the reviewer is re-spawned.
 - Clean round → the shred fast-forwards into the work-order branch `spaceport/<id>`; its worktree is removed.
-- Round 3 still failing → shred `escalated`; the user picks Stop (worktree kept) or Amend spec
-  (`shred.mjs drop`, back to the specs gate). Final approval pushes nothing: the user opens the PR.
+- Round 2 still failing → shred `escalated`; the user picks Stop (worktree kept) or Amend spec
+  (`shred.mjs drop`, back to the docs gate). Final approval pushes nothing: the user opens the PR.
 
-**Test relevance** (standards-validator). Every test in the diff must earn its place:
-- Covers a requirement `R-xx` or a named edge case of one.
-- Asserts behaviour, not implementation details (no test that only verifies a mock was called).
-- Not a duplicate of another test; not tautological (would fail if the code were wrong).
-- Irrelevant tests are a Major finding.
+**UX level.** The architect sets it per shred in `plan.md`; the reviewer gets it in its prompt:
 
-**UX level.** The architect sets it per shred in `plan.md`:
-
-| Level | Validator does |
+| Level | Reviewer does |
 |-------|----------------|
-| `none` | Not spawned (no UI change) |
+| `none` | Skips UX |
 | `simple` | Reads the UI code only; no Playwright |
-| `deep` | Playwright required: launches the app (profile's run command), exercises each UI acceptance criterion, saves a screenshot per criterion |
+| `deep` | *(deferred: runs as simple)* Playwright: launch the app, exercise each UI criterion, screenshot each |
 
 ---
 
@@ -144,13 +128,12 @@ it, then builds the next requirement.
     intent.md                 ┐
     spec.md                   ├ living docs — amended only by liftoff, each ends with ## Changelog
     plan.md                   ┘
-    shreds/<n>/handoff.md     twin continuity (frontmatter: turn, twin, phase, challenge, build)
-    shreds/<n>/turns/<k>.md   handoff as turn k left it (archived by shred.mjs turn)
-    shreds/<n>/diff-r<k>.patch    shred diff validators read (validate.mjs round)
+    shreds/<n>/diff-r<k>.patch    shred diff reviewers read (review.mjs round)
     shreds/<n>/findings/r<k>-<role>.md
     ledger.md                 time + tokens per subagent run (hook-written)
     postmortem.md
     .changelog.json           body hash + row count per living doc (changelog hook)
+  gates-green.json            gate cache: keys of trees + commands already green (gates.mjs)
 ```
 
 **Living docs.** Liftoff updates them as work reveals new facts. Each change appends a row:
@@ -160,7 +143,8 @@ it, then builds the next requirement.
 | Date | Step | Change | Why |
 ```
 
-**Requirement IDs.** `spec.md` numbers every requirement `R-01`, `R-02`… Tests reference the ID they
+**Requirement IDs.** `spec.md` numbers every requirement `R-01`, `R-02`… each ending with a
+`- Test: automated — <file>: <assertion>` or `- Test: manual — <how>` line. Tests reference the ID they
 cover (name, attribute or comment, per stack profile).
 
 ---
@@ -172,7 +156,7 @@ stack-specific commands.
 
 **`agent_type`.** Every hook receives a JSON description of the event. When a subagent acts, it includes
 `agent_type`: the agent's name. Absent = liftoff (main session). Plugin components are namespaced
-under the plugin name, so the twin is `spaceport:twin`; hooks still match the bare form too.
+under the plugin name, so the builder is `spaceport:builder`; hooks still match the bare form too.
 
 **Agent names are provisional.** A name is the agent file's `name` field. Hooks read names from one
 module (`scripts/roles.mjs`), and the static checks (§11b) flag any dangling reference, so a rename is
@@ -180,22 +164,22 @@ one file plus the references the checks list.
 
 | Rule | Event | Applies to | Check |
 |------|-------|-----------|-------|
-| Standards on every edit | PostToolUse `Edit\|Write` | twin | Run profile's formatter + linter on the changed file; violation → feedback to the twin |
-| Read-only checkers | PreToolUse `Edit\|Write\|NotebookEdit` | explorer, profiler (except `profile.md`, `proposals/**`), architect, validators | Deny; fails closed |
+| Read-only checkers | PreToolUse `Edit\|Write\|NotebookEdit` | explorer, profiler (except `profile.md`, `proposals/**`), architect, reviewers | Deny; fails closed |
 | Living docs owned by liftoff | PreToolUse `Edit\|Write` on `intent/spec/plan.md` | any subagent | Deny |
 | Changelog required | Stop | liftoff | Living doc body changed since last snapshot without a new changelog row → block |
-| Twin phase | PreToolUse `Edit\|Write` | twin | No phase removes a test line committed by an earlier turn (multiset vs `HEAD`). REFACTOR: no test file edits. BUILD: production edit only once a changed test references the requirement. Test files = profile `test-globs` |
-| Stay in the worktree | PreToolUse `Edit\|Write` | twin | Path outside the active shred's worktree (except its `handoff.md`) → deny. Bash is not parsed: the turn check flags main-repo changes made during the turn |
-| Turn complete | SubagentStop | twin | `shred.mjs` check: handoff at this turn and its last phase; every incoming open doubt resolved; no earlier test line removed; no main-repo change; gates green. Blocks ≤3 times per turn; `shred.mjs turn` refuses to advance until it passes |
-| Solo complete | SubagentStop | solo | `bench.mjs` checkBench: the twins' final-turn bar (gates, no `TODO`, every `R-xx` in a test, no main-repo change). Blocks ≤3, then `bench.mjs round` records what is missing. No phase guards |
-| UX deep evidence | SubagentStop | ux-validator at `deep` | One screenshot per UI acceptance criterion exists *(deferred: deep runs as simple)* |
-| Shred complete | SubagentStop | twin, final turn | Gates green, no `TODO`/`NotImplemented` in diff, every shred `R-xx` referenced by a test |
-| Human gates | PostToolUse `AskUserQuestion` | liftoff | Question tagged `[gate <id> <gate>]` answered `Approve…` → approval + doc hash in `state.json`; every answer logged to `gates.log`. `state.mjs step` refuses a step whose earlier gates are unapproved or whose doc changed since |
+| Builder writes | PreToolUse `Edit\|Write` | builder | `guard-builder`: path outside the active shred's worktree → deny; removing a committed test line (multiset vs `HEAD`; test files = profile `test-globs`) → deny unless a reviewer licensed it. Bash is not parsed: the build check flags main-repo changes. Fails closed |
+| Build complete | SubagentStop | builder | `guard-builder` → `shred.mjs` checkBuild: no committed test line removed, no main-repo change, no `TODO`/`NotImplemented` in the diff, every shred `R-xx` referenced by a changed test, gates green (cached by tree hash). Blocks ≤3 per build; `shred.mjs built` refuses until it passes. Fails open |
+| Human gates | PostToolUse `AskUserQuestion` | liftoff | Question tagged `[gate <id> <gate>]` answered `Approve…` → approval + hash of each gated doc in `state.json`; every answer logged to `gates.log`. `state.mjs step` refuses a step whose earlier gates are unapproved or whose docs changed since |
 | Script-owned state | PreToolUse `Edit|Write` | everyone, liftoff included | `state.json`, `gates.log`, `.changelog.json`, `ledger.md` → deny |
-| Round cap | PreToolUse `Agent` | everyone | `guard-spawn`: twin only while a shred is in work, validator only while one is validating (or a benchmark is); solo only while a benchmark is open; escalated shred → deny. No work order in the repo → pass |
-| Validator writes | PreToolUse `Edit|Write` | validators | Only its own `findings/r<k>-<role>.md` |
+| Round cap | PreToolUse `Agent` | everyone | `guard-spawn`: builder only while a shred is in work, reviewers only while one is reviewing; escalated shred → deny. No work order in the repo → pass. A `SendMessage` resume is not a spawn: the builder hooks still apply |
+| Reviewer writes | PreToolUse `Edit|Write` | reviewers | Only its own `findings/r<k>-<role>.md` |
 | Liftoff writes no code | PreToolUse `Edit|Write` | liftoff | Target inside a shred worktree not yet landed → deny |
-| Ledger | SubagentStop | all | `ledger.mjs`: sum token usage (last entry per message id) + elapsed time (first → last entry) from `agent_transcript_path`; one row per agent id in the latest work order not yet final-approved, per-role totals. Fails open |
+| Ledger | SubagentStop | all | `ledger.mjs`: sum token usage (last entry per message id) + elapsed time (first → last entry) from `agent_transcript_path`; one row per agent id (a resumed builder's row is rewritten) in the work order with a shred in progress, else the latest not yet final-approved. Fails open. `ledger.mjs cost <id>` reconciles output and $ with each session's `cost-state` (`costs.mjs`) |
+
+**Gate cache.** `gates.mjs` `runGates` keys a run on the worktree's content (a temp-index `git add -A` +
+`write-tree`, untracked files included, the real index untouched) plus the gate commands, and skips
+gates already green for that key (`.liftoff/gates-green.json`, last 20). Red is never cached: it may be
+flaky. Gitignored files are not part of the key.
 
 ---
 
@@ -208,12 +192,12 @@ Small, single-purpose, loaded on demand by agents through the Skill tool.
 | `liftoff` | main | Entry point: thin step map; loads `steps/<step>.md` on entering a step |
 | `explore-repo` | profiler | Writes / refreshes `profile.md` |
 | `amend-doc` | liftoff | Edit a living doc + append changelog row |
-| `draft-docs` | architect | Brainstorm questions, draft `spec.md` / `plan.md` from templates |
-| `write-handoff` | twin | Fill `handoff.md` in the fixed format; run the turn check (`shred.mjs check`) |
+| `draft-docs` | architect | Brainstorm questions, draft `spec.md` + `plan.md` from templates in one pass |
 | `run-gates` | liftoff | Run profile's lint, typecheck, test; summarize |
-| `log-finding` | validators | Append a graded finding in the fixed format |
-| `report-back` | every subagent | Fixed, short return format to liftoff |
-| `postmortem` | liftoff | Write `postmortem.md`, feed `lessons.md` |
+| `log-finding` | reviewers | Write the round's findings file with the severity rubric (§5) |
+| `postmortem` | liftoff | Write `postmortem.md` (with the true $ from `ledger.mjs cost`), feed `lessons.md` |
+
+Each agent ends with a fixed short report format in its own definition.
 
 ---
 
@@ -222,10 +206,10 @@ Small, single-purpose, loaded on demand by agents through the Skill tool.
 - `liftoff/SKILL.md` is a **map**: steps, gates, where each step's instructions live. Each
   `steps/*.md` loads only when that step starts.
 - Agent definitions are **short**: role, boundaries, which skills to call. They do not inline skill
-  content (no `skills:` preload, except possibly `report-back`).
+  content (no `skills:` preload).
 - `profile.md` and `lessons.md` are read only by the agents and steps that need them.
-- Subagents return a `report-back` summary; full output stays on disk. Liftoff's context grows by
-  summaries only.
+- Subagents return a short fixed report; full output stays on disk. Scripts print compact JSON.
+  Liftoff's context grows by summaries only.
 
 ---
 
@@ -234,8 +218,8 @@ Small, single-purpose, loaded on demand by agents through the Skill tool.
 After final approval, liftoff runs `postmortem` (prompt-only, no hook):
 - What failed, which round caught it, which agent caused it, time/tokens from the ledger.
 - Durable lessons appended to `.liftoff/lessons.md` (repo-specific), one line each, tagged with the role
-  that should act differently: `- [twin] …`. Scripts inline each role's lines into the twin and validator
-  prompts they build; the architect reads its lines in `draft-docs`.
+  that should act differently: `- [builder] …`. Scripts inline each role's lines into the builder and
+  reviewer prompts they build; the architect reads its lines in `draft-docs`.
 - Lessons that are factory-wide are listed as suggested changes to the plugin (agents, skills, hooks)
   for you to accept.
 
@@ -250,7 +234,7 @@ and its own marketplace. Entry point: `/spaceport:liftoff`. Node.js is a prerequ
 software-factory/
   .claude-plugin/plugin.json
   .claude-plugin/marketplace.json
-  agents/        explorer.md, profiler.md, architect.md, twin.md, *-validator.md
+  agents/        explorer.md, profiler.md, architect.md, builder.md, reviewer.md, security-reviewer.md
   skills/        liftoff/ (SKILL.md + steps/), amend-doc/, run-gates/, …
   hooks/         hooks.json
   scripts/       *.mjs (hook implementations)
@@ -264,7 +248,8 @@ software-factory/
 3. Prints next step: run liftoff; first run triggers the profiler.
 
 **Profile.** The profiler writes `.liftoff/profile.md`: flat frontmatter keys
-(`stack`, `setup`, `gate-format|lint|typecheck|build|test`, `run`, `req-tag`, `test-globs`, `ui-globs`; `none` = n/a) + architecture, folder
+(`stack`, `setup`, `gate-format|lint|typecheck|build|test`, `run`, `req-tag`, `test-globs`, `ui-globs`, optional
+`sensitive-globs`; `none` = n/a) + architecture, folder
 roles, conventions. The profiler infers without running anything; liftoff runs the gates (`run-gates`) and
 re-spawns the profiler on failure (max 2). Known stacks are cue files (`skills/explore-repo/stacks/`), each
 with a fixture + eval; an unknown repo gets `stack: other` and a proposal in `.liftoff/proposals/<shape>/`.
@@ -275,9 +260,9 @@ replaces) and a pre-filled `profile.md`; `scripts/scaffold.mjs` runs it and comm
 track the installed SDK; they need network.
 
 **Worktrees.** Used whenever possible: one per shred, created and removed by liftoff
-(`git worktree`). The built-in agent `isolation: worktree` is not used for twins — it creates a new
-worktree per spawn and branches from the default branch, but twins must share one worktree across turns.
-Independent shreds may run in parallel; dependent ones merge in order.
+(`git worktree`, sibling folder `<repo>.spaceport/`). The built-in agent `isolation: worktree` is not
+used — it branches from the default branch and is per spawn, but a shred's fix rounds reuse its worktree.
+One shred at a time (parallel shreds out of scope).
 
 ---
 
@@ -289,7 +274,7 @@ Three layers, from cheap and deterministic to costly and statistical.
 |-------|-------|-----|------|
 | **Scripts** | Every hook and the install script | `node:test` (built in, no deps). Feed a fixture hook-input JSON on stdin, assert exit code / decision JSON. Fixture repos for profile-dependent hooks | Every commit |
 | **Static checks** on agents + skills | Frontmatter valid (`name`, `description`, `tools`, `model`); every file a skill or step references exists; every skill an agent names exists; every agent name used by hooks exists; no `skills:` preload; size budget per `SKILL.md` / agent file (enforces progressive disclosure) | `node:test` over the plugin folder | Every commit |
-| **Behavioural evals** for agents + skills | Scenario per agent against a fixture repo, asserting on artifacts: profiler → correct gate commands in `profile.md`; twin → hooks pass, requirement covered; each validator → catches a seeded defect at the right severity; liftoff → reply follows the contract | Headless runs (`claude -p`) or `claude plugin eval` *(verify its format at milestone 1)*. LLM output varies: run N times, require a pass rate | On demand / before a release (costs tokens) |
+| **Behavioural evals** for agents + skills | Scenario per agent against a fixture repo, asserting on artifacts: profiler → correct gate commands in `profile.md`; architect → spec + plan with `Test:` lines; reviewer → catches each seeded defect (spec, test, UX) as blocking; security reviewer → the injection as Critical; postmortem; liftoff → reply follows the contract. The builder is checked by its hooks' tests and a manual run | Headless runs (`claude -p`) or `claude plugin eval` *(verify its format at milestone 1)*. LLM output varies: run N times, require a pass rate | On demand / before a release (costs tokens) |
 
 Agent and skill behaviour can't be unit-tested like code; the static checks and evals together are the
 closest equivalent.
@@ -318,7 +303,10 @@ Checked against Claude Code docs (2026-10-12). These shape the design.
 | Subagents can spawn subagents, up to 3 levels (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`) | Architect may call explorer itself; cap depth to keep cost bounded |
 | **Plugin agents ignore `hooks`, `mcpServers`, `permissionMode` frontmatter** | All enforcement lives in plugin `hooks/hooks.json`, keyed on `agent_type` |
 | Hook input carries `agent_id` / `agent_type` inside subagents | Per-role rules from one hooks file |
-| SubagentStop can block (`decision: "block"` + reason becomes the agent's next instruction) | Completeness gates force twins to continue, not just fail |
+| SubagentStop can block (`decision: "block"` + reason becomes the agent's next instruction); re-blocks honoured, `stop_hook_active` true after the first (spike 2026-10-16) | Completeness gates force the builder to continue, not just fail |
+| VS Code ≤2.1.300 dropped a block that followed the agent's `SubagentHandback` call (agent never resumed); 2.1.301 resumed | `shred.mjs built` re-checks after the builder returns |
+| `SendMessage` to a finished subagent resumes it: same `agent_id` / `agent_type`, PreToolUse + SubagentStop fire, one transcript file | Fix rounds go to the same builder, warm |
+| A skill's `model` frontmatter does not switch the main session's model | Liftoff runs on the session model |
 | SubagentStop provides `agent_transcript_path` | Ledger sums real token usage from the transcript |
 | `Agent` tool result `totalTokens` covers the **final request only** | Don't use it for the ledger |
 | `isolation: worktree` branches from default branch, auto-cleaned if unchanged | Liftoff manages worktrees itself |
@@ -343,14 +331,11 @@ None. Agent names are provisional (§7).
 | 6 | Ledger hook, postmortem, `lessons.md` | Ledger shows real tokens/time per run; lessons written |
 | 7 | Stack templates for empty repos | Idea → new app walking skeleton on both stacks |
 | 8 | Solo baseline benchmark | One agent builds a landed shred from the same spec + base commit in its own worktree; the same validators grade it once. Report: tokens, time, $, blocking findings, tests per `R-xx`, twins vs solo |
+| 9 | Lean line: docs step, builder, reviewer | Steps `intent, docs, work, review, final` with 3 human gates; twins, validators and the benchmark removed; build hook re-blocks up to 3; gates cached by tree hash; architect, reviewer and security-reviewer evals pass |
 
-**Running the benchmark (M8).** Once, by hand, on a shred landed since M8 and before final approval (the ledger
-stops logging after it): `bench.mjs open <id> <n>` → spawn `spaceport:solo` with its prompt → `bench.mjs round <id> <n>`
-→ spawn the printed validators in parallel → `bench.mjs report <id> <n>` writes `shreds/<n>/bench.md`. Ledger runs are
-attributed by start time (twins: shred opened → landed; solo: bench opened →). Twins show round-1 and all-round
-blocking findings; solo is graded once. Output tokens and $ are reconciled with each session's `cost-state` (true per-model
-totals, written when the session ends; `costs.mjs`). Runs of a still-open session keep the transcript snapshot,
-which undercounts output. The solo worktree is kept.
+M8 verdict (sandbox + NHL, four runs): twins cost 3-6× and took 4-6× longer than one agent for the same
+real defects caught. M9 removed the twins and the benchmark tooling; `costs.mjs` survives behind
+`ledger.mjs cost`.
 
 ---
 
@@ -382,3 +367,4 @@ which undercounts output. The solo worktree is kept.
 | 2026-10-15 | Milestone 7: `scaffold.mjs` runs a stack recipe (official generators) into an empty repo, writes the profile, commits; template = green base, skeleton built by twins; `.liftoff/roadmap.md` splits an app into work orders | M7 planning; user picked generators, green base, roadmap file, current empty repo |
 | 2026-10-15 | Milestone 8 built: `solo` agent, `bench.mjs` open/round/report, solo completeness in `guard-turn`, bench-aware `guard-spawn`; ledger untouched (time-window attribution) | M8 planning; user picked completeness-only hooks for solo, no skill (one-off), round-1 + all-round comparison, price table |
 | 2026-10-16 | Malformed `## Remove` block → findings rejected (validator re-spawned); bench output tokens and $ reconciled with session `cost-state` | NHL run: an unclosed fence licensed nothing and stalled the shred; transcript output_tokens are stream-start snapshots (~4× low) |
+| 2026-10-16 | Milestone 9, lean line: one `docs` step + gate (spec + plan, `Test:` line per requirement); one builder replaces the twins, fix rounds via `SendMessage`; one reviewer (strict rubric) + Opus security reviewer only on `sensitive-globs`; max 2 rounds; gate cache; bench, solo, challenger, handoff removed | M8 benchmarks: twins 3-6× the cost, 4-6× the time, no better catch; validators graded noisily from cold contexts. User picked: no twins, 1 reviewer + conditional security, SendMessage fixes, merged docs gate |
